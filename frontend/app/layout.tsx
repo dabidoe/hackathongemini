@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Libre_Baskerville, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { AuthProvider } from '@/contexts/auth-context'
 import './globals.css'
 
 const libreBaskerville = Libre_Baskerville({ 
@@ -66,8 +67,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${libreBaskerville.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
-        {children}
-        <Analytics />
+        <AuthProvider>
+          {children}
+          <Analytics />
+        </AuthProvider>
       </body>
     </html>
   )

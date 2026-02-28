@@ -1,12 +1,15 @@
 /**
  * Returns task config for a place. Checks Firestore placeTaskConfig first;
  * falls back to default tasks with placeName interpolated.
+ * Uses Place Details API to derive questions (accessibility, business status, place type).
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getCharactersForPlace } from "@/lib/characters";
+import { fetchPlaceDetails, type PlaceDetailsData } from "@/lib/place-details";
 
 export interface PlaceTask {
-  characterId: "1" | "2" | "3" | "4";
+  characterId: "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8";
   type: "photo" | "yes_no" | "description" | "confirm" | "location";
   title: string;
   description: string;
@@ -15,15 +18,40 @@ export interface PlaceTask {
   reward: { xp: number; blockProgress?: number };
 }
 
-const NPC_META: Record<string, { name: string; title: string; avatarInitial: string }> = {
-  "1": { name: "ZERO", title: "Information Broker", avatarInitial: "Z" },
-  "2": { name: "NOVA", title: "Tech Scavenger", avatarInitial: "N" },
-  "3": { name: "CIPHER", title: "Accessibility Scout", avatarInitial: "C" },
-  "4": { name: "ECHO", title: "Street Historian", avatarInitial: "E" },
-};
+function getDescriptionQuestion(placeName: string, types?: string[]): string {
+  const hasPark = types?.some((t) => t === "park" || t === "natural_feature");
+  const hasRestaurant = types?.some((t) => t === "restaurant" || t === "food");
+  const hasStore = types?.some((t) => t === "store" || t === "shopping_mall");
 
-function getDefaultTasks(placeName: string): PlaceTask[] {
-  return [
+  if (hasPark) {
+    return `What stands out to you about ${placeName}? Describe the park's atmosphere and surroundings.`;
+  }
+  if (hasRestaurant) {
+    return `What stands out to you about ${placeName}? Describe the ambiance or your experience.`;
+  }
+  if (hasStore) {
+    return `What stands out to you about ${placeName}? Describe what you see or remember.`;
+  }
+  return `What stands out to you about ${placeName}? Describe what you see or remember.`;
+}
+
+function getDefaultTasks(
+  placeName: string,
+  details?: PlaceDetailsData | null
+): { tasks: PlaceTask[]; replacementTasks: PlaceTask[] } {
+  const wheelchairKnown = details?.wheelchairAccessibleEntrance === true;
+  const businessOperational = details?.businessStatus === "OPERATIONAL";
+  const types = details?.types;
+
+  const openQuestion = businessOperational
+    ? `Can you confirm that ${placeName} is currently open for business?`
+    : `Is ${placeName} currently open for business?`;
+
+  const accessQuestion = wheelchairKnown
+    ? `Can you confirm that ${placeName} is wheelchair accessible?`
+    : `Is ${placeName} wheelchair accessible?`;
+
+  const initial: PlaceTask[] = [
     {
       characterId: "1",
       type: "photo",
@@ -37,7 +65,7 @@ function getDefaultTasks(placeName: string): PlaceTask[] {
       type: "yes_no",
       title: "Status Check",
       description: "Help verify current conditions in this area.",
-      question: `Is ${placeName} currently open for business?`,
+      question: openQuestion,
       reward: { xp: 10, blockProgress: 3 },
     },
     {
@@ -45,7 +73,7 @@ function getDefaultTasks(placeName: string): PlaceTask[] {
       type: "yes_no",
       title: "Access Report",
       description: "Help map accessibility features in the area.",
-      question: `Is ${placeName} wheelchair accessible?`,
+      question: accessQuestion,
       reward: { xp: 12, blockProgress: 4 },
     },
     {
@@ -53,10 +81,45 @@ function getDefaultTasks(placeName: string): PlaceTask[] {
       type: "description",
       title: "Street Memory",
       description: `Collect firsthand accounts of ${placeName} for the archive.`,
-      question: `What stands out to you about ${placeName}? Describe what you see or remember.`,
+      question: getDescriptionQuestion(placeName, types),
       reward: { xp: 20, blockProgress: 5 },
     },
   ];
+  const replacement: PlaceTask[] = [
+    {
+      characterId: "5",
+      type: "yes_no",
+      title: "Parking Check",
+      description: "Help verify parking availability.",
+      question: `Is there parking available at or near ${placeName}?`,
+      reward: { xp: 8, blockProgress: 2 },
+    },
+    {
+      characterId: "6",
+      type: "yes_no",
+      title: "Crowd Level",
+      description: "Report on current conditions.",
+      question: `Is ${placeName} currently crowded?`,
+      reward: { xp: 10, blockProgress: 3 },
+    },
+    {
+      characterId: "7",
+      type: "description",
+      title: "First Impression",
+      description: "Share your first impression.",
+      question: `What was your first impression when you arrived at ${placeName}?`,
+      reward: { xp: 15, blockProgress: 4 },
+    },
+    {
+      characterId: "8",
+      type: "yes_no",
+      title: "Cleanliness",
+      description: "Help rate the area.",
+      question: `Is ${placeName} well-maintained and clean?`,
+      reward: { xp: 10, blockProgress: 3 },
+    },
+  ];
+  return { tasks: initial, replacementTasks: replacement };
 }
 
 export async function GET(
@@ -73,6 +136,9 @@ export async function GET(
 
     let tasks: PlaceTask[] | null = null;
     let placeName = placeNameFromQuery ?? placeId;
+
+    const placeDetails = await fetchPlaceDetails(placeId);
+    if (placeDetails?.name) placeName = placeDetails.name;
 
     try {
       const { getFirebaseFirestore } = await import("@/lib/firebase-admin");
@@ -91,19 +157,38 @@ export async function GET(
       console.warn("Firestore placeTaskConfig unavailable:", firebaseErr);
     }
 
+    let replacementTasks: PlaceTask[] = [];
     if (!tasks || tasks.length === 0) {
-      tasks = getDefaultTasks(placeName);
+      const defaults = getDefaultTasks(placeName, placeDetails);
+      tasks = defaults.tasks;
+      replacementTasks = defaults.replacementTasks;
+    } else {
+      const defaults = getDefaultTasks(placeName, placeDetails);
+      replacementTasks = defaults.replacementTasks;
     }
 
-    const tasksWithMeta = tasks.map((t) => ({
+    // Get 8 characters for this location (4 initial + 4 replacement)
+    const placeCharacters = getCharactersForPlace(placeId, 8);
+    const charIndex = (id: string) => Math.min(Math.max(0, parseInt(id, 10) - 1), placeCharacters.length - 1);
+
+    const withMeta = (t: PlaceTask) => ({
       ...t,
-      ...NPC_META[t.characterId],
-    }));
+      ...(placeCharacters[charIndex(t.characterId)] ?? placeCharacters[0] ?? {
+        name: "Traveler",
+        title: "Adventurer",
+        avatarInitial: "?",
+        imageUrl: "",
+      }),
+    });
+
+    const tasksWithMeta = tasks.map(withMeta);
+    const replacementWithMeta = replacementTasks.map(withMeta);
 
     return NextResponse.json({
       placeId,
       placeName,
       tasks: tasksWithMeta,
+      replacementTasks: replacementWithMeta,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Tasks API error";

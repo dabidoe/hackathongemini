@@ -1,24 +1,10 @@
 /**
  * Fetches Place Details from Google (Legacy API).
- * Returns accessibility info (wheelchair_accessible_entrance) when available.
+ * Returns accessibility info (wheelchair_accessible_entrance), business_status, opening_hours when available.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-
-interface PlaceDetailsResult {
-  name?: string;
-  wheelchair_accessible_entrance?: boolean;
-  formatted_address?: string;
-  rating?: number;
-  user_ratings_total?: number;
-  [key: string]: unknown;
-}
-
-interface PlaceDetailsResponse {
-  result?: PlaceDetailsResult;
-  status: string;
-  error_message?: string;
-}
+import { fetchPlaceDetails } from "@/lib/place-details";
 
 export async function GET(
   request: NextRequest,
@@ -30,46 +16,30 @@ export async function GET(
       return NextResponse.json({ error: "Missing placeId" }, { status: 400 });
     }
 
-    const key = process.env.GOOGLE_PLACES_API_KEY;
-    if (!key) {
+    if (!process.env.GOOGLE_PLACES_API_KEY) {
       return NextResponse.json(
         { error: "GOOGLE_PLACES_API_KEY is not set" },
         { status: 500 }
       );
     }
 
-    const fields = [
-      "name",
-      "formatted_address",
-      "rating",
-      "user_ratings_total",
-      "wheelchair_accessible_entrance",
-    ].join(",");
-
-    const url = new URL(
-      "https://maps.googleapis.com/maps/api/place/details/json"
-    );
-    url.searchParams.set("place_id", placeId);
-    url.searchParams.set("fields", fields);
-    url.searchParams.set("key", key);
-
-    const res = await fetch(url.toString());
-    const data: PlaceDetailsResponse = await res.json();
-
-    if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+    const details = await fetchPlaceDetails(placeId);
+    if (!details) {
       return NextResponse.json(
-        { error: data.error_message ?? data.status },
+        { error: "Place not found or API error" },
         { status: 400 }
       );
     }
 
-    const result = data.result ?? {};
     return NextResponse.json({
-      name: result.name,
-      formattedAddress: result.formatted_address,
-      rating: result.rating,
-      userRatingsTotal: result.user_ratings_total,
-      wheelchairAccessibleEntrance: result.wheelchair_accessible_entrance,
+      name: details.name,
+      formattedAddress: details.formattedAddress,
+      rating: details.rating,
+      userRatingsTotal: details.userRatingsTotal,
+      wheelchairAccessibleEntrance: details.wheelchairAccessibleEntrance,
+      businessStatus: details.businessStatus,
+      openNow: details.openNow,
+      types: details.types,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Place Details error";

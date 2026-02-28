@@ -110,33 +110,33 @@ export function CharacterCard({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/60 backdrop-blur-md pointer-events-auto">
       <GlassPanel 
-        className="w-full max-w-sm animate-in zoom-in-95 fade-in duration-300 overflow-hidden"
+        className="w-full max-w-md animate-in zoom-in-95 fade-in duration-300 overflow-hidden"
         variant="strong"
         glowColor="cyan"
       >
         {/* Close Button */}
         <button 
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-background/50 hover:bg-muted transition-colors"
+          className="absolute top-3 right-3 z-10 p-2 rounded-full bg-background/60 hover:bg-muted transition-colors"
         >
-          <X className="w-4 h-4 text-muted-foreground" />
+          <X className="w-4 h-4 text-foreground" />
         </button>
 
-        {/* Character Portrait */}
-        <div className="relative h-48 w-full overflow-hidden">
+        {/* Character Portrait - larger hero image */}
+        <div className="relative w-full aspect-[4/5] overflow-hidden">
           {/* Placeholder/Loading State or Fallback */}
           {(!imageLoaded || imageError) && (
             <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-accent/20 flex items-center justify-center">
               <div className="text-center">
-                <div className={`w-20 h-20 mx-auto rounded-full border-2 border-primary/50 flex items-center justify-center bg-background/50 ${!imageError ? 'animate-pulse' : ''}`}>
-                  <span className="text-3xl font-mono font-bold text-primary">
+                <div className={`w-24 h-24 mx-auto rounded-full border-2 border-primary/50 flex items-center justify-center bg-background/50 ${!imageError ? 'animate-pulse' : ''}`}>
+                  <span className="text-4xl font-mono font-bold text-primary">
                     {character.name.charAt(0)}
                   </span>
                 </div>
                 {!imageError && (
                   <div className="mt-2 flex items-center justify-center gap-1 text-muted-foreground">
                     <Sparkles className="w-3 h-3 animate-spin" />
-                    <span className="text-[10px] font-mono">Loading portrait...</span>
+                    <span className="text-xs font-mono">Loading portrait...</span>
                   </div>
                 )}
               </div>
@@ -152,37 +152,38 @@ export function CharacterCard({
               className={`object-cover transition-opacity duration-500 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageError(true)}
+              unoptimized={character.imageUrl.startsWith("/")}
             />
           )}
           
           {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
           
-          {/* Character Level Badge */}
-          <div className="absolute top-3 left-3 px-2 py-1 rounded-md bg-accent/80 backdrop-blur-sm">
-            <span className="text-[10px] font-mono text-accent-foreground font-bold uppercase">
+          {/* NPC Badge */}
+          <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-primary/90 backdrop-blur-sm border border-primary/50">
+            <span className="text-[10px] font-mono font-bold text-primary-foreground uppercase">
               NPC
             </span>
           </div>
         </div>
 
-        {/* Header with Name & Title */}
-        <div className="p-4 -mt-8 relative">
-          <div className="flex items-start justify-between mb-2">
+        {/* Header with Name, Title & Trust */}
+        <div className="p-4 -mt-6 relative">
+          <div className="flex items-start justify-between gap-3 mb-2">
             <div>
-              <h2 className="text-lg font-mono font-bold text-foreground flex items-center gap-2">
+              <h2 className="text-xl font-mono font-bold text-foreground flex items-center gap-2">
                 {character.name}
-                <Sparkles className="w-3 h-3 text-accent" />
+                <Star className="w-4 h-4 text-accent fill-accent" />
               </h2>
-              <p className="text-[10px] font-mono text-primary uppercase tracking-wider">
+              <p className="text-sm font-mono text-primary uppercase tracking-wider mt-0.5">
                 {character.title}
               </p>
             </div>
-            {/* XP Badge */}
-            <div className="flex items-center gap-1 px-2 py-1 rounded bg-primary/20 border border-primary/30">
-              <Star className="w-3 h-3 text-primary" />
-              <span className="text-xs font-mono font-bold text-primary">
-                +{character.xpReward || 50} XP
+            {/* Trust / Affinity indicator */}
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md shrink-0 bg-muted/50 border border-border`}>
+              <Heart className={`w-3.5 h-3.5 ${trustColor} fill-current`} />
+              <span className={`text-sm font-mono font-bold ${trustColor}`}>
+                {character.trustLevel}%
               </span>
             </div>
           </div>
@@ -219,13 +220,13 @@ export function CharacterCard({
               {/* Chat Area - Primary Focus */}
               <div 
                 ref={chatContainerRef}
-                className="p-3 rounded-lg bg-muted/30 border border-border max-h-40 overflow-y-auto"
+                className="p-3 rounded-lg bg-muted/30 border border-border max-h-44 overflow-y-auto"
               >
                 {/* Initial NPC message with typewriter effect */}
                 {(displayedText || chatMessages.length === 0) && (
                   <div className="flex items-start gap-2">
                     <MessageSquare className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                    <div className="text-xs font-mono text-foreground/90 leading-relaxed">
+                    <div className="text-sm font-mono text-foreground leading-relaxed">
                       {displayedText}
                       {isAnimating && (
                         <span className="inline-block w-2 h-4 bg-primary ml-0.5 animate-pulse" />
@@ -245,10 +246,10 @@ export function CharacterCard({
                         {msg.sender === 'npc' && (
                           <MessageSquare className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                         )}
-                        <div className={`max-w-[85%] px-2 py-1 rounded text-xs font-mono ${
+                        <div className={`max-w-[85%] px-2.5 py-1.5 rounded text-sm font-mono ${
                           msg.sender === 'player' 
                             ? 'bg-primary/20 text-primary' 
-                            : 'text-foreground/90'
+                            : 'text-foreground'
                         }`}>
                           {msg.text}
                         </div>
@@ -297,7 +298,7 @@ export function CharacterCard({
                     onStartQuest?.()
                   }
                 }}
-                className={`w-full h-10 font-mono text-xs transition-all duration-300 ${
+                className={`w-full h-11 font-mono text-sm transition-all duration-300 ${
                   isQuestActive
                     ? "bg-neon-green/25 border-neon-green text-neon-green shadow-[0_0_12px_var(--neon-green)] hover:bg-neon-green/30"
                     : "bg-primary/20 border border-primary text-primary hover:bg-primary/30"
@@ -374,12 +375,12 @@ export function CharacterCard({
         </div>
 
         {/* Footer Status */}
-        <div className="px-4 py-2 border-t border-border flex items-center justify-between">
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <Clock className="w-3 h-3" />
-            <span className="text-[9px] font-mono">Available Now</span>
+        <div className="px-4 py-2.5 border-t border-border flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Clock className="w-3.5 h-3.5" />
+            <span className="text-xs font-mono">Available Now</span>
           </div>
-          <span className="text-[9px] font-mono text-muted-foreground animate-flicker">
+          <span className="text-[10px] font-mono text-muted-foreground animate-flicker">
             AI_GENERATED//NANO_BANANA
           </span>
         </div>

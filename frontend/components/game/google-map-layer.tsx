@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Script from "next/script"
-import { NYC_FALLBACK, BOUNDING_RADIUS_METERS } from "@/lib/geo"
+import { BOUNDING_RADIUS_METERS } from "@/lib/geo"
 import { useMapContextOptional } from "@/contexts/map-context"
 
 interface GoogleMapLayerProps {
@@ -15,6 +15,8 @@ export function GoogleMapLayer({ onMapReady }: GoogleMapLayerProps) {
   const ctxRef = useRef(ctx)
   ctxRef.current = ctx
   const [mapsLoaded, setMapsLoaded] = useState(false)
+  const playerPos = ctx?.playerPos ?? { lat: 40.758, lng: -73.9855 }
+  const mapInstanceRef = useRef<google.maps.Map | null>(null)
 
   useEffect(() => {
     const c = ctxRef.current
@@ -23,7 +25,7 @@ export function GoogleMapLayer({ onMapReady }: GoogleMapLayerProps) {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
     if (!apiKey) return
 
-    const center = { lat: NYC_FALLBACK.lat, lng: NYC_FALLBACK.lng }
+    const center = { lat: playerPos.lat, lng: playerPos.lng }
     const map = new google.maps.Map(mapRef.current, {
       center,
       zoom: 15,
@@ -34,6 +36,7 @@ export function GoogleMapLayer({ onMapReady }: GoogleMapLayerProps) {
       gestureHandling: "greedy",
     })
 
+    mapInstanceRef.current = map
     c.setMap(map)
 
     const updateBounds = () => {
@@ -54,15 +57,21 @@ export function GoogleMapLayer({ onMapReady }: GoogleMapLayerProps) {
     onMapReady?.(map)
 
     return () => {
+      mapInstanceRef.current = null
       ctxRef.current?.setMap(null)
       ctxRef.current?.setBounds(null)
     }
   }, [mapsLoaded])
 
   useEffect(() => {
+    if (!mapInstanceRef.current || !ctxRef.current) return
+    mapInstanceRef.current.setCenter({ lat: playerPos.lat, lng: playerPos.lng })
+  }, [playerPos.lat, playerPos.lng])
+
+  useEffect(() => {
     if (!mapsLoaded || !ctxRef.current) return
 
-    const url = `/api/places?lat=${NYC_FALLBACK.lat}&lng=${NYC_FALLBACK.lng}&radiusMeters=${BOUNDING_RADIUS_METERS}`
+    const url = `/api/places?lat=${playerPos.lat}&lng=${playerPos.lng}&radiusMeters=${BOUNDING_RADIUS_METERS}`
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
@@ -72,7 +81,7 @@ export function GoogleMapLayer({ onMapReady }: GoogleMapLayerProps) {
       .catch(() => {
         ctxRef.current?.setHotspots([])
       })
-  }, [mapsLoaded])
+  }, [mapsLoaded, playerPos.lat, playerPos.lng])
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 

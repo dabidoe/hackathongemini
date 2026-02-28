@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useMemo } from "react"
+import Image from "next/image"
 import { Zap, Camera, Check, X, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -17,7 +18,9 @@ import { CharacterCard } from "./character-card"
 import { ProfileTab } from "./profile-tab"
 import { TrophiesTab } from "./trophies-tab"
 import { useMapContextOptional } from "@/contexts/map-context"
+import { useAuth } from "@/contexts/auth-context"
 import { haversineMeters } from "@/lib/geo"
+import { getLocationImageUrl } from "@/lib/location-images"
 import type { PlaceResult } from "@/app/api/places/route"
 
 function latLngToPercent(
@@ -93,6 +96,7 @@ const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1519501025264-65ba1
 
 export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
   const mapContext = useMapContextOptional()
+  const { user, getIdToken } = useAuth()
   const [activeTab, setActiveTab] = useState<"map" | "quests" | "profile" | "achievements">("map")
   const [activeQuest, setActiveQuest] = useState<Quest | null>(null)
   const [showNPCDialog, setShowNPCDialog] = useState(false)
@@ -116,42 +120,53 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     name: string
     title: string
     avatarInitial: string
+    imageUrl?: string
     type: "photo" | "yes_no" | "description" | "confirm" | "location"
     description: string
     question?: string
     hint?: string
     reward: { xp: number; blockProgress?: number }
   }>>([])
+  const [locationReplacementTasks, setLocationReplacementTasks] = useState<typeof locationTasks>([])
   const [locationTasksLoading, setLocationTasksLoading] = useState(false)
-  const [locationTasksExpanded, setLocationTasksExpanded] = useState<string | null>(null)
+  const [selectedLocationTask, setSelectedLocationTask] = useState<(typeof locationTasks)[0] | null>(null)
+  const [taskImageErrors, setTaskImageErrors] = useState<Set<string>>(new Set())
   const [pendingLocationPhotoTask, setPendingLocationPhotoTask] = useState<(typeof locationTasks)[0] | null>(null)
-  const [visitedPlaceIds, setVisitedPlaceIds] = useState<Set<string>>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("visitedPlaceIds")
-        return stored ? new Set(JSON.parse(stored)) : new Set()
-      } catch { return new Set() }
-    }
-    return new Set()
-  })
-  const [visitedPlaceNames, setVisitedPlaceNames] = useState<Record<string, string>>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("visitedPlaceNames")
-        return stored ? JSON.parse(stored) : {}
-      } catch { return {} }
-    }
-    return {}
-  })
-  const [completedLocationTasks, setCompletedLocationTasks] = useState<Record<string, string[]>>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("completedLocationTasks")
-        return stored ? JSON.parse(stored) : {}
-      } catch { return {} }
-    }
-    return {}
-  })
+  // Initialize empty to avoid hydration mismatch (server has no localStorage).
+  // Synced from localStorage in useEffect after mount.
+  const [visitedPlaceIds, setVisitedPlaceIds] = useState<Set<string>>(() => new Set())
+  const [visitedPlaceNames, setVisitedPlaceNames] = useState<Record<string, string>>(() => ({}))
+  const [completedLocationTasks, setCompletedLocationTasks] = useState<Record<string, string[]>>(() => ({}))
+  const [completedTaskHistory, setCompletedTaskHistory] = useState<Array<{
+    id: string
+    placeId: string
+    placeName: string
+    characterId: string
+    characterName: string
+    taskTitle: string
+    xpEarned: number
+    type: "photo" | "yes_no" | "description" | "confirm" | "location"
+    completedAt: string
+  }>>(() => [])
+
+  useEffect(() => {
+    try {
+      const storedIds = localStorage.getItem("visitedPlaceIds")
+      if (storedIds) {
+        const parsed = JSON.parse(storedIds)
+        if (Array.isArray(parsed)) setVisitedPlaceIds(new Set(parsed))
+      }
+      const storedNames = localStorage.getItem("visitedPlaceNames")
+      if (storedNames) setVisitedPlaceNames(JSON.parse(storedNames))
+      const storedCompleted = localStorage.getItem("completedLocationTasks")
+      if (storedCompleted) setCompletedLocationTasks(JSON.parse(storedCompleted))
+      const storedHistory = localStorage.getItem("completedTaskHistory")
+      if (storedHistory) {
+        const parsed = JSON.parse(storedHistory)
+        if (Array.isArray(parsed)) setCompletedTaskHistory(parsed)
+      }
+    } catch { /* ignore */ }
+  }, [])
 
   // Player stats
   const [playerStats, setPlayerStats] = useState({
@@ -334,10 +349,16 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     }
   ])
 
+  // Reset task image errors when switching places
+  useEffect(() => {
+    setTaskImageErrors(new Set())
+  }, [selectedHotspot?.place_id])
+
   // Fetch location-specific tasks when a hotspot is selected
   useEffect(() => {
     if (!selectedHotspot) {
       setLocationTasks([])
+      setLocationReplacementTasks([])
       return
     }
     setLocationTasksLoading(true)
@@ -349,6 +370,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
       .then((data) => {
         if (Array.isArray(data.tasks)) {
           setLocationTasks(data.tasks)
+          setLocationReplacementTasks(Array.isArray(data.replacementTasks) ? data.replacementTasks : [])
           setVisitedPlaceIds((prev) => {
             const next = new Set(prev)
             next.add(placeId)
@@ -370,9 +392,13 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
           })
         } else {
           setLocationTasks([])
+          setLocationReplacementTasks([])
         }
       })
-      .catch(() => setLocationTasks([]))
+      .catch(() => {
+        setLocationTasks([])
+        setLocationReplacementTasks([])
+      })
       .finally(() => setLocationTasksLoading(false))
   }, [selectedHotspot?.place_id])
 
@@ -383,6 +409,29 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
 
   const dismissNotification = useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id))
+  }, [])
+
+  const removeMission = useCallback((placeId: string) => {
+    setVisitedPlaceIds((prev) => {
+      const next = new Set(prev)
+      next.delete(placeId)
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("visitedPlaceIds", JSON.stringify([...next]))
+        } catch { /* ignore */ }
+      }
+      return next
+    })
+    setVisitedPlaceNames((prev) => {
+      const next = { ...prev }
+      delete next[placeId]
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("visitedPlaceNames", JSON.stringify(next))
+        } catch { /* ignore */ }
+      }
+      return next
+    })
   }, [])
 
   const triggerReward = useCallback((reward: { xp: number; blockProgress?: number; message?: string; type?: "success" | "achievement" | "level_up" }) => {
@@ -400,7 +449,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
   const handleHotspotClick = (hotspot: PlaceResult) => {
     setSelectedHotspot(hotspot)
     setShowLocationScreen(true)
-    setLocationTasksExpanded(null)
+    setSelectedLocationTask(null)
     onMarkerTap?.(hotspot.place_id)
   }
 
@@ -435,14 +484,18 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         body.answers = [{ questionId: "q1", answer }]
       }
 
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      const token = await getIdToken()
+      if (token) headers["Authorization"] = `Bearer ${token}`
+
       const res = await fetch("/api/quest/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(body),
       })
       const data = await res.json().catch(() => ({}))
 
-      setLocationTasksExpanded(null)
+      setSelectedLocationTask(null)
 
       if (!res.ok) {
         addNotification({
@@ -454,6 +507,18 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
       }
 
       if (data.verdict === "approved") {
+        const characterName = npcs.find((n) => n.id === task.characterId)?.name ?? "Unknown"
+        const entry = {
+          id: `${placeId}-${task.characterId}-${Date.now()}`,
+          placeId,
+          placeName,
+          characterId: task.characterId,
+          characterName,
+          taskTitle: task.title,
+          xpEarned: data.xpAwarded ?? task.reward?.xp ?? 0,
+          type: task.type,
+          completedAt: new Date().toISOString(),
+        }
         setCompletedLocationTasks((prev) => {
           const list = prev[placeId] ?? []
           if (list.includes(task.characterId)) return prev
@@ -465,12 +530,24 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
           }
           return next
         })
+        setCompletedTaskHistory((prev) => {
+          const next = [...prev, entry]
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem("completedTaskHistory", JSON.stringify(next))
+            } catch { /* ignore */ }
+          }
+          return next
+        })
         triggerReward({
           xp: data.xpAwarded,
           blockProgress: data.blockDelta,
           message: data.npcReactionText,
           type: "success",
         })
+        if (user) {
+          window.dispatchEvent(new CustomEvent("user:quest-completed"))
+        }
       } else {
         addNotification({
           type: "warning",
@@ -544,9 +621,13 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     setIsSubmitting(true)
     
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      const token = await getIdToken()
+      if (token) headers["Authorization"] = `Bearer ${token}`
+
       const response = await fetch("/api/quest/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           questId: npc.microQuest.id,
           placeId: npc.id,
@@ -584,6 +665,9 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
             blockDelta: data.blockDelta
           }
         }))
+        if (user) {
+          window.dispatchEvent(new CustomEvent("user:quest-completed"))
+        }
       } else {
         addNotification({
           type: "warning",
@@ -665,9 +749,13 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         ? selectedNPC.microQuest.id 
         : activeQuest?.id || "photo-quest"
       
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      const token = await getIdToken()
+      if (token) headers["Authorization"] = `Bearer ${token}`
+
       const response = await fetch("/api/quest/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           questId,
           placeId: selectedNPC?.id || "unknown",
@@ -717,6 +805,9 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
             xpAwarded: data.xpAwarded
           }
         }))
+        if (user) {
+          window.dispatchEvent(new CustomEvent("user:quest-completed"))
+        }
       } else {
         addNotification({
           type: "warning",
@@ -752,11 +843,12 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
       selectedHotspot.lat,
       selectedHotspot.lng
     )
+    const locationImage = getLocationImageUrl(selectedHotspot.name, selectedHotspot.place_id)
     return {
       id: selectedHotspot.place_id,
       name: selectedHotspot.name,
       type: selectedHotspot.types?.[0] ?? "Point of Interest",
-      imageUrl: PLACEHOLDER_IMAGE,
+      imageUrl: locationImage || PLACEHOLDER_IMAGE,
       distance: Math.round(dist),
       visitorsToday: selectedHotspot.user_ratings_total,
       lastVisited: selectedHotspot.rating ? `★ ${selectedHotspot.rating}` : undefined,
@@ -765,7 +857,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-10">
-      {/* Map area - hotspot markers from Google Places (fade out during zoom/pan) */}
+      {/* Map area - hotspot markers + player marker (fade out during zoom/pan, fade in when idle) */}
       <div
         className="absolute inset-0 pointer-events-none transition-opacity duration-300"
         style={{ opacity: isMapIdle ? 1 : 0 }}
@@ -795,7 +887,28 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
               />
             )
           })}
+        {/* Player marker - same fade behavior as hotspot markers */}
+        {bounds && playerPos && (
+          <MapMarker
+            type="player"
+            name="You"
+            style={{
+              left: `${latLngToPercent(playerPos.lat, playerPos.lng, bounds).x}%`,
+              top: `${latLngToPercent(playerPos.lat, playerPos.lng, bounds).y}%`,
+              pointerEvents: "auto",
+            }}
+          />
+        )}
       </div>
+
+      {/* Map click to close tabs - when Profile/Quests/Trophies is open, clicking the map closes it */}
+      {activeTab !== "map" && (
+        <div
+          className="absolute top-24 left-0 right-0 bottom-24 pointer-events-auto z-[5]"
+          onClick={() => setActiveTab("map")}
+          aria-label="Click to close tab and return to map"
+        />
+      )}
 
       {/* Top HUD */}
       <div className="absolute top-0 left-0 right-0 p-4 pointer-events-auto">
@@ -806,6 +919,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
           maxXp={playerStats.maxXp}
           streak={playerStats.streak}
           questsCompleted={playerStats.questsCompleted}
+          onProfileClick={() => setActiveTab("profile")}
         />
       </div>
 
@@ -813,7 +927,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
       <div className="absolute top-24 right-4 left-4 md:left-auto md:w-64 pointer-events-auto z-20">
         <QuestTracker
           activeQuest={activeQuest}
-          activeMissionCount={(activeQuestNpcId || expandedQuestNpcId) ? 1 : 0}
+          activeMissionCount={visitedPlaceIds.size}
           onQuestClick={() => {
             if (activeQuest?.objectives.some(o => o.requiresPhoto && !o.completed)) {
               setShowPhotoProof(true)
@@ -824,12 +938,18 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
 
       {/* Trophies Panel - Completed tasks and badges */}
       {activeTab === "achievements" && (
-        <TrophiesTab />
+        <TrophiesTab
+          onClose={() => setActiveTab("map")}
+          completedTasks={completedTaskHistory}
+          npcs={npcs}
+          playerStats={playerStats}
+        />
       )}
 
       {/* Profile Panel - Your Character (same style as other tabs, no pop-up) */}
       {activeTab === "profile" && (
         <ProfileTab
+          onClose={() => setActiveTab("map")}
           playerStats={{
             level: playerStats.level,
             xp: playerStats.xp,
@@ -847,7 +967,17 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-mono text-foreground uppercase tracking-wider">Tasks at Locations</h3>
-              <span className="text-xs font-mono text-primary">{visitedPlaceIds.size} visited</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-primary">{visitedPlaceIds.size} visited</span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("map")}
+                  className="p-1.5 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             {visitedPlaceIds.size === 0 ? (
               <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center">
@@ -899,6 +1029,15 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
                           >
                             Open
                           </Button>
+                          <button
+                            type="button"
+                            onClick={() => removeMission(placeId)}
+                            className="p-1.5 rounded-full bg-muted hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                            aria-label={`Remove ${name} from missions`}
+                            title="Remove mission"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -997,29 +1136,32 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         isSubmitting={isSubmitting}
       />
 
-      {/* Location Screen with Nearby Places */}
+      {/* Location Screen - background image with overlay cards */}
       {showLocationScreen && currentLocation && (
-        <div className="fixed inset-0 z-40 flex flex-col bg-background pointer-events-auto">
-          {/* Location Display - Top 3/4 */}
-          <div className="relative flex-1 min-h-0">
+        <div className="fixed inset-0 z-40 flex flex-col pointer-events-auto">
+          {/* Full-screen Location Display (background) */}
+          <div className="absolute inset-0">
             <LocationDisplay 
               location={currentLocation}
               onLocationChange={() => {}}
             />
-            
-            {/* Close button */}
-            <button
-              onClick={() => setShowLocationScreen(false)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-background/80 backdrop-blur-sm border border-border flex items-center justify-center text-foreground hover:bg-muted transition-colors z-10"
-            >
-              <span className="text-lg">x</span>
-            </button>
           </div>
 
-          {/* Location Tasks - NPCs at this place */}
-          <div className="relative bg-background/95 backdrop-blur-md border-t border-border pt-3 pb-6 max-h-[40vh] overflow-y-auto">
-            <div className="px-4 pb-4">
-              <h3 className="text-sm font-mono text-foreground uppercase tracking-wider mb-3">
+          {/* Gradient for card readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/30 to-transparent pointer-events-none" />
+
+          {/* Close button */}
+          <button
+            onClick={() => { setShowLocationScreen(false); setSelectedLocationTask(null) }}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-background/80 backdrop-blur-sm border border-border flex items-center justify-center text-foreground hover:bg-muted transition-colors z-20"
+          >
+            <span className="text-lg">x</span>
+          </button>
+
+          {/* Task cards - centered on screen, 2x2 grid, card size from profile image */}
+          <div className="absolute inset-0 z-10 flex items-center justify-center p-4">
+            <div className="flex flex-col items-center max-h-full overflow-auto">
+              <h3 className="text-xs font-mono font-bold text-foreground uppercase tracking-wider mb-3 shrink-0">
                 Tasks at {selectedHotspot?.name}
               </h3>
               {locationTasksLoading ? (
@@ -1027,121 +1169,155 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
               ) : locationTasks.length === 0 ? (
                 <p className="text-xs font-mono text-muted-foreground">No tasks at this location.</p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {locationTasks.map((task) => {
-                    const taskKey = `${selectedHotspot?.place_id}-${task.characterId}`
-                    const isExpanded = locationTasksExpanded === taskKey
+                <div className="grid grid-cols-4 gap-2 w-full max-w-4xl">
+                  {locationTasks.map((originalTask, slotIndex) => {
+                    const placeId = selectedHotspot?.place_id ?? ""
+                    const isOriginalCompleted = (completedLocationTasks[placeId] ?? []).includes(originalTask.characterId)
+                    const replacementTask = locationReplacementTasks[slotIndex]
+                    const task = isOriginalCompleted && replacementTask ? replacementTask : originalTask
+                    const isCompleted = (completedLocationTasks[placeId] ?? []).includes(task.characterId)
+                    const taskKey = `${placeId}-${task.characterId}`
+                    const taskTypeLabel = task.type === "photo" ? "Photo" : task.type === "yes_no" ? "Survey" : task.type === "description" ? "Description" : "Task"
                     return (
                       <div
                         key={taskKey}
-                        className="w-full rounded-lg transition-all duration-200 overflow-hidden border border-border bg-card/80 hover:border-primary/50"
+                        className={`relative w-full min-w-0 rounded-xl overflow-hidden border-2 bg-background/85 backdrop-blur-md shadow-lg ${isCompleted ? "border-neon-green/50" : "border-border"}`}
                       >
-                        <button
-                          className="w-full text-left"
-                          onClick={() => setLocationTasksExpanded((p) => (p === taskKey ? null : taskKey))}
-                        >
-                          <div className="flex items-stretch">
-                            <div className="relative w-16 h-16 flex-shrink-0 rounded-l-lg overflow-hidden bg-gradient-to-br from-muted/30 to-muted/20 flex items-center justify-center">
-                              <span className="text-xl font-mono font-bold text-muted-foreground">{task.avatarInitial}</span>
-                              <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-background/90 backdrop-blur-sm">
-                                <span className="text-[7px] font-mono uppercase font-bold text-muted-foreground">
-                                  {task.type === "photo" ? "Photo" : task.type === "yes_no" ? "Survey" : task.type === "description" ? "Description" : "Task"}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex-1 p-2 flex flex-col justify-between min-w-0">
-                              <div>
-                                <div className="flex items-center justify-between gap-2 mb-0.5">
-                                  <h4 className="text-xs font-mono font-bold text-foreground truncate">{task.name}</h4>
-                                  <span className="text-[9px] font-mono text-muted-foreground">+{task.reward.xp} XP</span>
-                                </div>
-                                <p className="text-[9px] font-mono text-primary uppercase tracking-wide truncate">{task.title}</p>
-                              </div>
-                              <p className="text-[9px] font-mono text-muted-foreground line-clamp-1 leading-tight">{task.description}</p>
+                        {/* Completed checkmark overlay */}
+                        {isCompleted && (
+                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/40 backdrop-blur-sm">
+                            <div className="flex flex-col items-center gap-1">
+                              <Check className="w-10 h-10 text-neon-green" strokeWidth={2.5} />
+                              <span className="text-xs font-mono font-bold text-neon-green uppercase">Completed</span>
                             </div>
                           </div>
-                        </button>
-                        {isExpanded && (
-                          <div className="border-t border-neon-green/30 bg-neon-green/5 p-3 space-y-3">
-                            <p className="text-xs font-mono text-foreground/90 leading-relaxed">{task.description}</p>
+                        )}
+                        {/* Image (larger portrait) */}
+                        <div className="relative w-full aspect-[3/4] overflow-hidden bg-gradient-to-br from-muted/40 to-muted/20">
+                          {task.imageUrl && !taskImageErrors.has(taskKey) ? (
+                            <Image
+                              src={task.imageUrl}
+                              alt={task.name}
+                              fill
+                              className="object-cover object-top"
+                              sizes="(max-width: 768px) 50vw, 360px"
+                              unoptimized={task.imageUrl.startsWith("/")}
+                              onError={() => setTaskImageErrors((s) => new Set(s).add(taskKey))}
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-2xl font-mono font-bold text-muted-foreground">
+                                {task.avatarInitial}
+                              </span>
+                            </div>
+                          )}
+                          <div className="absolute left-2 bottom-2 px-2 py-1 rounded-md bg-background/80 backdrop-blur border border-border">
+                            <span className="text-[10px] font-mono uppercase font-bold text-foreground">
+                              {taskTypeLabel}
+                            </span>
+                          </div>
+                        </div>
+                        {/* Card body (under image) */}
+                        <div className="p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="text-xs font-mono font-bold text-foreground truncate">
+                              {task.name}
+                            </h4>
+                            <span className="text-[11px] font-mono font-semibold text-primary shrink-0">
+                              +{task.reward.xp} XP
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[10px] font-mono text-muted-foreground line-clamp-2">
+                            {task.title}
+                          </p>
+                        </div>
+                        {/* Full task detail (always visible for every card) */}
+                        <div className="px-3 pb-3 border-t border-border/60 space-y-2">
+                            <p className="pt-2 text-[10px] font-mono text-foreground leading-snug">
+                              {task.description}
+                            </p>
                             {task.question && (
-                              <div className="bg-neon-green/10 rounded-lg p-2 border border-neon-green/30">
-                                <p className="text-xs font-mono text-foreground text-center">{task.question}</p>
-                              </div>
-                            )}
-                            {task.hint && (
-                              <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> {task.hint}
+                              <p className="text-[10px] font-mono text-foreground/90 italic">
+                                {task.question}
                               </p>
                             )}
-                            <div className="space-y-2">
-                              {task.type === "photo" && (
+                            {task.hint && (
+                              <p className="text-[9px] font-mono text-muted-foreground flex items-center gap-1">
+                                <Clock className="w-3 h-3 shrink-0" /> {task.hint}
+                              </p>
+                            )}
+                            <div className="space-y-2 pt-1">
+                              {!isCompleted && task.type === "photo" && (
                                 <Button
-                                  className="w-full h-9 font-mono text-xs bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
-                                  onClick={() => { setPendingLocationPhotoTask(task); setShowPhotoProof(true) }}
+                                  className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                                  onClick={() => {
+                                    setPendingLocationPhotoTask(task)
+                                    setShowPhotoProof(true)
+                                    setSelectedLocationTask(null)
+                                  }}
                                   disabled={isSubmitting}
                                 >
-                                  <Camera className="w-3.5 h-3.5 mr-2" />
+                                  <Camera className="w-3 h-3 mr-2" />
                                   {isSubmitting ? "Uploading..." : "Upload Photo"}
                                 </Button>
                               )}
-                              {task.type === "yes_no" && (
+                              {!isCompleted && task.type === "yes_no" && (
                                 <div className="flex gap-2">
                                   <Button
-                                    className="flex-1 h-9 font-mono text-xs bg-neon-green/10 border border-neon-green/50 text-neon-green hover:bg-neon-green/20"
+                                    className="flex-1 h-9 font-mono text-[10px] bg-neon-green/10 border border-neon-green/50 text-neon-green hover:bg-neon-green/20"
                                     onClick={() => handleLocationTaskComplete(task, true)}
                                     disabled={isSubmitting}
                                   >
-                                    <Check className="w-3.5 h-3.5 mr-1.5" /> Yes
+                                    <Check className="w-3 h-3 mr-1" /> Yes
                                   </Button>
                                   <Button
-                                    className="flex-1 h-9 font-mono text-xs bg-destructive/10 border border-destructive/50 text-destructive hover:bg-destructive/20"
+                                    className="flex-1 h-9 font-mono text-[10px] bg-destructive/10 border border-destructive/50 text-destructive hover:bg-destructive/20"
                                     onClick={() => handleLocationTaskComplete(task, false)}
                                     disabled={isSubmitting}
                                   >
-                                    <X className="w-3.5 h-3.5 mr-1.5" /> No
+                                    <X className="w-3 h-3 mr-1" /> No
                                   </Button>
                                 </div>
                               )}
-                              {task.type === "description" && (
+                              {!isCompleted && task.type === "description" && (
                                 <>
                                   <Textarea
                                     placeholder="Type your answer..."
                                     value={questPanelDescription[taskKey] ?? ""}
-                                    onChange={(e) => setQuestPanelDescription((a) => ({ ...a, [taskKey]: e.target.value }))}
-                                    className="min-h-[80px] text-xs font-mono resize-none border border-neon-green/30 bg-background/50 placeholder:text-muted-foreground/60"
+                                    onChange={(e) =>
+                                      setQuestPanelDescription((a) => ({ ...a, [taskKey]: e.target.value }))
+                                    }
+                                    className="min-h-[72px] text-[10px] font-mono resize-none border border-neon-green/30 bg-background/50"
                                     disabled={isSubmitting}
                                   />
                                   <Button
-                                    className="w-full h-9 font-mono text-xs bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                                    className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
                                     onClick={() => {
                                       const text = questPanelDescription[taskKey]?.trim()
                                       if (text) handleLocationTaskComplete(task, text)
                                     }}
                                     disabled={isSubmitting || !(questPanelDescription[taskKey]?.trim())}
                                   >
-                                    <Check className="w-3.5 h-3.5 mr-2" /> Submit
+                                    <Check className="w-3 h-3 mr-2" /> Submit
                                   </Button>
                                 </>
                               )}
-                              {(task.type === "confirm" || task.type === "location") && (
+                              {!isCompleted && (task.type === "confirm" || task.type === "location") && (
                                 <Button
-                                  className="w-full h-9 font-mono text-xs bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                                  className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
                                   onClick={() => handleLocationTaskComplete(task, true)}
                                   disabled={isSubmitting}
                                 >
-                                  <Check className="w-3.5 h-3.5 mr-2" /> {task.type === "location" ? "I'm Here" : "Confirm"}
+                                  <Check className="w-3 h-3 mr-2" /> {task.type === "location" ? "I'm Here" : "Confirm"}
                                 </Button>
                               )}
+                              {!isCompleted && task.reward.blockProgress && (
+                                <p className="text-[9px] font-mono text-neon-green">
+                                  +{task.reward.blockProgress}% block
+                                </p>
+                              )}
                             </div>
-                            {task.reward.blockProgress && (
-                              <div className="pt-2 border-t border-neon-green/30 flex justify-between text-[10px] font-mono text-muted-foreground">
-                                <span>Block Progress</span>
-                                <span className="text-neon-green">+{task.reward.blockProgress}%</span>
-                              </div>
-                            )}
                           </div>
-                        )}
                       </div>
                     )
                   })}

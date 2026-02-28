@@ -92,6 +92,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let userId: string | null = null
+    let decodedToken: { uid: string; name?: string; email?: string; picture?: string } | null = null
+    const authHeader = request.headers.get("Authorization")
+    const idToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null
+    if (idToken) {
+      try {
+        const { getFirebaseAuth } = await import("@/lib/firebase-admin")
+        const auth = getFirebaseAuth()
+        const decoded = await auth.verifyIdToken(idToken)
+        userId = decoded.uid
+        decodedToken = {
+          uid: decoded.uid,
+          name: decoded.name,
+          email: decoded.email,
+          picture: decoded.picture,
+        }
+      } catch {
+        // Invalid or expired token - continue as anonymous
+      }
+    }
+
     // Simulate API delay for "verification"
     await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000))
 
@@ -147,6 +168,42 @@ export async function POST(request: NextRequest) {
         }
       } catch (firebaseErr) {
         console.warn("Failed to write placeContributions:", firebaseErr)
+      }
+
+      if (userId && xpAwarded > 0) {
+        try {
+          const { getFirebaseFirestore } = await import("@/lib/firebase-admin")
+          const { FieldValue } = await import("firebase-admin/firestore")
+          const db = getFirebaseFirestore()
+          const userRef = db.collection("users").doc(userId)
+          await db.runTransaction(async (tx) => {
+            const userSnap = await tx.get(userRef)
+            const currentXp = userSnap.exists ? (userSnap.data()?.xp ?? 0) : 0
+            const newXp = currentXp + xpAwarded
+            const userData: Record<string, unknown> = {
+              xp: newXp,
+              lastUpdated: FieldValue.serverTimestamp(),
+            }
+            if (!userSnap.exists && decodedToken) {
+              userData.displayName = decodedToken.name
+              userData.email = decodedToken.email
+              userData.photoURL = decodedToken.picture
+            }
+            tx.set(userRef, userData, { merge: true })
+            const contribRef = db.collection("userContributions").doc()
+            tx.set(contribRef, {
+              userId,
+              placeId,
+              placeName,
+              questionType,
+              answer: photoUrl ?? answers?.[0]?.answer ?? null,
+              xpEarned: xpAwarded,
+              completedAt: FieldValue.serverTimestamp(),
+            })
+          })
+        } catch (firebaseErr) {
+          console.warn("Failed to update user xp:", firebaseErr)
+        }
       }
     }
 

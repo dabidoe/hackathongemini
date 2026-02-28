@@ -6,6 +6,7 @@
 import { getApps, initializeApp, cert, type ServiceAccount } from "firebase-admin/app"
 import { getStorage } from "firebase-admin/storage"
 import { getFirestore } from "firebase-admin/firestore"
+import { getAuth } from "firebase-admin/auth"
 import { readFileSync } from "fs"
 import { resolve } from "path"
 
@@ -65,6 +66,7 @@ function getServiceAccount(): ServiceAccount | null {
 
 let _storage: ReturnType<typeof getStorage> | null = null
 let _firestore: ReturnType<typeof getFirestore> | null = null
+let _auth: ReturnType<typeof getAuth> | null = null
 
 export function getFirebaseStorage() {
   if (!_storage) {
@@ -107,4 +109,12 @@ export function getFirebaseFirestore() {
     _firestore = getFirestore()
   }
   return _firestore
+}
+
+export function getFirebaseAuth() {
+  if (!_auth) {
+    const app = getFirebaseApp()
+    _auth = getAuth(app)
+  }
+  return _auth
 }

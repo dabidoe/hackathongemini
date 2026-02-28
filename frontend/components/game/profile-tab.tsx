@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback } from "react"
-import { User, Sparkles, RefreshCw, Upload } from "lucide-react"
+import { User, Sparkles, RefreshCw, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import { ProfileChips, type SelectedChips } from "./profile-chips"
@@ -15,9 +15,10 @@ interface ProfileTabProps {
     milesWalked: number
     streak: number
   }
+  onClose?: () => void
 }
 
-export function ProfileTab({ playerStats }: ProfileTabProps) {
+export function ProfileTab({ playerStats, onClose }: ProfileTabProps) {
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null)
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null)
   const [selectedChips, setSelectedChips] = useState<SelectedChips>({})
@@ -107,11 +108,23 @@ export function ProfileTab({ playerStats }: ProfileTabProps) {
   return (
     <div className="absolute bottom-24 left-0 right-0 max-h-[85vh] min-h-[70vh] overflow-y-auto pointer-events-auto z-25 bg-background/70 backdrop-blur-sm border-t border-border">
       <div className="flex flex-col items-center gap-6 p-6">
-        <div className="flex items-center gap-2 w-full max-w-xs">
-          <User className="w-5 h-5 text-primary flex-shrink-0" />
-          <h2 className="text-sm font-mono font-bold text-foreground uppercase tracking-wider">
-            Your Character
-          </h2>
+        <div className="flex items-center justify-between w-full max-w-2xl">
+          <div className="flex items-center gap-2">
+            <User className="w-5 h-5 text-primary flex-shrink-0" />
+            <h2 className="text-sm font-mono font-bold text-foreground uppercase tracking-wider">
+              Your Character
+            </h2>
+          </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Avatar + chips: stacked on mobile, side-by-side on larger screens */}

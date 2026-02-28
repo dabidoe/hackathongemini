@@ -24,7 +24,7 @@ export interface Quest {
 interface QuestTrackerProps {
   activeQuest: Quest | null
   onQuestClick?: () => void
-  /** Number of tasks currently activated (Activate button). When > 0, banner shows "Active mission: N" */
+  /** Number of locations with activated tasks. When > 0, banner shows "Activated missions: N" */
   activeMissionCount?: number
 }
 
@@ -37,8 +37,8 @@ export function QuestTracker({ activeQuest, onQuestClick, activeMissionCount = 0
           <Target className={`w-4 h-4 ${hasActive ? "text-neon-green" : ""}`} />
           <span className={`text-xs font-mono uppercase tracking-wider ${hasActive ? "text-neon-green" : ""}`}>
             {hasActive
-              ? `Active mission${activeMissionCount !== 1 ? "s" : ""}: ${activeMissionCount}`
-              : "No Active Mission"}
+              ? `Activated mission${activeMissionCount !== 1 ? "s" : ""}: ${activeMissionCount}`
+              : "No Activated Missions"}
           </span>
         </div>
         <p className="text-[10px] font-mono text-muted-foreground/60 mt-1 ml-6">

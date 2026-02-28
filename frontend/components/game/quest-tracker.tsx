@@ -24,20 +24,25 @@ export interface Quest {
 interface QuestTrackerProps {
   activeQuest: Quest | null
   onQuestClick?: () => void
+  /** Number of tasks currently activated (Activate button). When > 0, banner shows "Active mission: N" */
+  activeMissionCount?: number
 }
 
-export function QuestTracker({ activeQuest, onQuestClick }: QuestTrackerProps) {
+export function QuestTracker({ activeQuest, onQuestClick, activeMissionCount = 0 }: QuestTrackerProps) {
   if (!activeQuest) {
+    const hasActive = activeMissionCount > 0
     return (
-      <GlassPanel className="p-3" glowColor="cyan">
+      <GlassPanel className="p-3" glowColor={hasActive ? "green" : "cyan"}>
         <div className="flex items-center gap-2 text-muted-foreground">
-          <Target className="w-4 h-4" />
-          <span className="text-xs font-mono uppercase tracking-wider">
-            No Active Mission
+          <Target className={`w-4 h-4 ${hasActive ? "text-neon-green" : ""}`} />
+          <span className={`text-xs font-mono uppercase tracking-wider ${hasActive ? "text-neon-green" : ""}`}>
+            {hasActive
+              ? `Active mission${activeMissionCount !== 1 ? "s" : ""}: ${activeMissionCount}`
+              : "No Active Mission"}
           </span>
         </div>
         <p className="text-[10px] font-mono text-muted-foreground/60 mt-1 ml-6">
-          Tap a marker to receive a quest
+          {hasActive ? "Open Quests tab to view" : "Tap a marker to receive a quest"}
         </p>
       </GlassPanel>
     )

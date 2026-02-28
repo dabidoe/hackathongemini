@@ -63,15 +63,18 @@ const npcPersonalities: Record<string, { style: string; phrases: string[] }> = {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: NPCMessageRequest = await request.json()
-    const { npcId, userText, currentNPCState } = body
+    const body = await request.json() as NPCMessageRequest
+    const npcId = body?.npcId ?? "1"
+    const userText = typeof body?.userText === "string" ? body.userText : ""
+    const currentNPCState = body?.currentNPCState
 
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400))
 
-    // Get personality based on NPC (simplified - would be fetched from DB in real app)
     const personalities = Object.keys(npcPersonalities)
-    const personality = npcPersonalities[personalities[parseInt(npcId) % personalities.length]]
+    const idx = parseInt(npcId, 10)
+    const personalityKey = personalities[Number.isNaN(idx) ? 0 : idx % personalities.length]
+    const personality = npcPersonalities[personalityKey]
     
     // Generate a response based on user input
     const phrases = personality.phrases

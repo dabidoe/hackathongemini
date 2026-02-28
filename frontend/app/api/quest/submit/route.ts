@@ -66,14 +66,24 @@ const npcReactions = {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: QuestSubmitRequest = await request.json()
-    const { questId, photoUrl, answers } = body
+    const body = await request.json() as QuestSubmitRequest
+    const questId = body?.questId ?? ""
+    const placeId = body?.placeId ?? ""
+    const photoUrl = body?.photoUrl
+    const answers = Array.isArray(body?.answers) ? body.answers : undefined
+
+    if (!questId || !placeId) {
+      return NextResponse.json(
+        { error: "Missing questId or placeId" },
+        { status: 400 }
+      )
+    }
 
     // Simulate API delay for "verification"
     await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000))
 
     // Determine quest type from questId pattern
-    const questType = questId.startsWith("mq") ? "micro" : "main"
+    const questType = String(questId).startsWith("mq") ? "micro" : "main"
     
     // Verify the submission
     const verification = verifySubmission(questType, photoUrl, answers)

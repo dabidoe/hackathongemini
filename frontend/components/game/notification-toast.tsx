@@ -67,18 +67,18 @@ export function NotificationToast({ notification, onDismiss }: NotificationToast
   const Icon = style.icon
 
   useEffect(() => {
-    // Entry animation
     const entryTimer = setTimeout(() => setIsEntering(false), 50)
-    
     const duration = notification.duration ?? 4000
+    let exitTimer: ReturnType<typeof setTimeout> | undefined
     const timer = setTimeout(() => {
       setIsExiting(true)
-      setTimeout(() => onDismiss(notification.id), 300)
+      exitTimer = setTimeout(() => onDismiss(notification.id), 300)
     }, duration)
 
     return () => {
       clearTimeout(entryTimer)
       clearTimeout(timer)
+      if (exitTimer !== undefined) clearTimeout(exitTimer)
     }
   }, [notification, onDismiss])
 

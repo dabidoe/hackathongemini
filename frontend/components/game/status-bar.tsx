@@ -1,6 +1,6 @@
 "use client"
 
-import { Signal, Battery, MapPin, Wifi, Flame } from "lucide-react"
+import { MapPin, Flame, Target } from "lucide-react"
 import { GlassPanel } from "./glass-panel"
 
 interface StatusBarProps {
@@ -8,8 +8,8 @@ interface StatusBarProps {
   level: number
   xp: number
   maxXp: number
-  isOnline: boolean
   streak?: number
+  questsCompleted?: number
 }
 
 export function StatusBar({ 
@@ -17,8 +17,8 @@ export function StatusBar({
   level, 
   xp, 
   maxXp,
-  isOnline,
-  streak = 0
+  streak = 0,
+  questsCompleted = 0
 }: StatusBarProps) {
   const xpPercentage = (xp / maxXp) * 100
 
@@ -56,7 +56,6 @@ export function StatusBar({
 
         {/* Right: Status Icons */}
         <div className="flex items-center gap-2">
-          {/* Streak */}
           {streak > 0 && (
             <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent/20 border border-accent/30">
               <Flame className="w-3.5 h-3.5 text-accent" />
@@ -67,16 +66,10 @@ export function StatusBar({
             <MapPin className="w-3 h-3 text-primary" />
             <span className="text-[10px] font-mono text-primary uppercase">GPS</span>
           </div>
-          <div className={`flex items-center gap-1 ${isOnline ? 'text-primary' : 'text-destructive'}`}>
-            {isOnline ? (
-              <Wifi className="w-3 h-3" />
-            ) : (
-              <Signal className="w-3 h-3" />
-            )}
-          </div>
-          <div className="flex items-center gap-0.5 text-foreground/60">
-            <Battery className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-mono">87</span>
+          <div className="flex items-center gap-1 text-foreground/80">
+            <Target className="w-3 h-3 text-primary" />
+            <span className="text-[10px] font-mono">{questsCompleted}</span>
+            <span className="text-[9px] font-mono text-muted-foreground uppercase hidden sm:inline">Missions</span>
           </div>
         </div>
       </div>

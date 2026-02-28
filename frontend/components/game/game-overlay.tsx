@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
+import { Zap, Camera, Check, X, Clock } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { StatusBar } from "./status-bar"
 import { QuestTracker, Quest } from "./quest-tracker"
 import { ActionBar } from "./action-bar"
@@ -8,12 +11,12 @@ import { NPCDialog } from "./npc-dialog"
 import { PhotoProof } from "./photo-proof"
 import { NotificationStack } from "./notification-toast"
 import { MapMarker } from "./map-marker"
-import { QuestCard } from "./quest-card"
 import { RewardAnimation } from "./reward-animation"
 import { LocationDisplay } from "./location-display"
 import { NPCCardStrip } from "./npc-card-strip"
 import { CharacterCard } from "./character-card"
-import { PlayerProfile } from "./player-profile"
+import { ProfileTab } from "./profile-tab"
+import { TrophiesTab } from "./trophies-tab"
 
 // Leaflet integration event payload type
 interface LeafletNPCPayload {
@@ -59,7 +62,7 @@ interface NPC {
   quest?: Quest
   microQuest?: {
     id: string
-    type: "photo" | "yes_no" | "confirm" | "location"
+    type: "photo" | "yes_no" | "description" | "confirm" | "location"
     title: string
     description: string
     question?: string
@@ -73,11 +76,10 @@ interface GameOverlayProps {
 }
 
 export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
-  const [activeTab, setActiveTab] = useState<"map" | "quests" | "profile" | "achievements" | "settings">("map")
+  const [activeTab, setActiveTab] = useState<"map" | "quests" | "profile" | "achievements">("map")
   const [activeQuest, setActiveQuest] = useState<Quest | null>(null)
   const [showNPCDialog, setShowNPCDialog] = useState(false)
   const [showPhotoProof, setShowPhotoProof] = useState(false)
-  const [showMicroQuest, setShowMicroQuest] = useState(false)
   const [showReward, setShowReward] = useState(false)
   const [showCharacterCard, setShowCharacterCard] = useState(false)
   const [showLocationScreen, setShowLocationScreen] = useState(false)
@@ -98,6 +100,10 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
   const [chatMessages, setChatMessages] = useState<{ id: string; sender: "npc" | "player"; text: string }[]>([])
   const [isNPCTyping, setIsNPCTyping] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeQuestNpcId, setActiveQuestNpcId] = useState<string | null>(null)
+  const [expandedQuestNpcId, setExpandedQuestNpcId] = useState<string | null>(null)
+  const [questPanelYesNo, setQuestPanelYesNo] = useState<Record<string, boolean | null>>({})
+  const [questPanelDescription, setQuestPanelDescription] = useState<Record<string, string>>({})
   
   // Player stats
   const [playerStats, setPlayerStats] = useState({
@@ -105,6 +111,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     maxXp: 2500,
     level: 12,
     streak: 7,
+    questsCompleted: 23,
     milesWalked: 3.2,
     blockProgress: 67,
     areaName: "Neon District"
@@ -270,9 +277,10 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
       },
       microQuest: {
         id: "mq4",
-        type: "confirm",
-        title: "Location Verify",
-        description: "Confirm you've reached this historic landmark.",
+        type: "description",
+        title: "Street Memory",
+        description: "ECHO collects firsthand accounts of this area for the archive.",
+        question: "What stands out to you about this place? Describe what you see or remember.",
         reward: { xp: 20, blockProgress: 5 }
       }
     }
@@ -310,21 +318,24 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     const matchedNPC = npcs.find(npc => npc.id === npcId)
     if (matchedNPC) {
       setSelectedNPC(matchedNPC)
-      setShowCharacterCard(true)
+      setExpandedQuestNpcId((prev) => (prev === npcId ? null : npcId))
     }
   }
 
   const handleCharacterStartQuest = () => {
+    setActiveTab("quests")
+    setExpandedQuestNpcId(selectedNPC?.id ?? null)
     setShowCharacterCard(false)
-    if (selectedNPC?.microQuest) {
-      setShowMicroQuest(true)
-    } else if (selectedNPC?.quest) {
+    if (selectedNPC?.quest && !selectedNPC?.microQuest) {
       setShowNPCDialog(true)
     }
   }
 
-  const handleTabChange = (tab: "map" | "quests" | "profile" | "achievements" | "settings") => {
+  const handleTabChange = (tab: "map" | "quests" | "profile" | "achievements") => {
     setActiveTab(tab)
+    if (tab === "map") {
+      setExpandedQuestNpcId(null)
+    }
   }
 
   const handleDialogOptionSelect = (option: { id: string; text: string; action?: string }) => {
@@ -340,12 +351,14 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
       setShowNPCDialog(false)
     } else if (option.action === "micro_quest" && selectedNPC?.microQuest) {
       setShowNPCDialog(false)
-      setShowMicroQuest(true)
+      setActiveTab("quests")
+      setExpandedQuestNpcId(selectedNPC.id)
     }
   }
 
-  const handleMicroQuestComplete = async (answer: string | boolean) => {
-    if (!selectedNPC?.microQuest) return
+  const handleMicroQuestComplete = async (answer: string | boolean, npcOverride?: NPC | null) => {
+    const npc = npcOverride ?? selectedNPC
+    if (!npc?.microQuest) return
     
     setIsSubmitting(true)
     
@@ -354,16 +367,24 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          questId: selectedNPC.microQuest.id,
-          placeId: selectedNPC.id,
+          questId: npc.microQuest.id,
+          placeId: npc.id,
           answers: [{ questionId: "q1", answer }]
         })
       })
 
-      const data = await response.json()
-      
-      setShowMicroQuest(false)
-      
+      const data = await response.json().catch(() => ({}))
+      setExpandedQuestNpcId((prev) => (prev === npc.id ? null : prev))
+
+      if (!response.ok) {
+        addNotification({
+          type: "warning",
+          title: "Submission Failed",
+          message: data?.error ?? "Please try again."
+        })
+        return
+      }
+
       if (data.verdict === "approved") {
         // Show reward animation
         triggerReward({
@@ -376,7 +397,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         // Emit quest completion to Leaflet map
         window.dispatchEvent(new CustomEvent("quest:completed", {
           detail: { 
-            placeId: selectedNPC.id, 
+            placeId: npc.id, 
             status: "approved",
             xpAwarded: data.xpAwarded,
             blockDelta: data.blockDelta
@@ -428,13 +449,12 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         })
       })
 
-      const data = await response.json()
-      
-      // Add NPC response
+      const data = await response.json().catch(() => ({}))
+      const reply = typeof data?.npcReply === "string" ? data.npcReply : "...[no response]... Try again."
       const npcMsg = {
         id: (Date.now() + 1).toString(),
         sender: "npc" as const,
-        text: data.npcReply
+        text: reply
       }
       setChatMessages(prev => [...prev, npcMsg])
     } catch (error) {
@@ -453,7 +473,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     setIsSubmitting(true)
     
     try {
-      const questId = showMicroQuest && selectedNPC?.microQuest 
+      const questId = selectedNPC?.microQuest 
         ? selectedNPC.microQuest.id 
         : activeQuest?.id || "photo-quest"
       
@@ -467,12 +487,19 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         })
       })
 
-      const data = await response.json()
-      
+      const data = await response.json().catch(() => ({}))
       setShowPhotoProof(false)
-      
-      if (showMicroQuest) {
-        setShowMicroQuest(false)
+      if (selectedNPC?.microQuest) {
+        setExpandedQuestNpcId((prev) => (prev === selectedNPC.id ? null : prev))
+      }
+
+      if (!response.ok) {
+        addNotification({
+          type: "warning",
+          title: "Submission Failed",
+          message: data?.error ?? "Please try again."
+        })
+        return
       }
 
       if (data.verdict === "approved") {
@@ -550,15 +577,16 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
           level={playerStats.level}
           xp={playerStats.xp}
           maxXp={playerStats.maxXp}
-          isOnline={true}
           streak={playerStats.streak}
+          questsCompleted={playerStats.questsCompleted}
         />
       </div>
 
-      {/* Quest Tracker - Top Right */}
-      <div className="absolute top-24 right-4 left-4 md:left-auto md:w-64 pointer-events-auto">
-        <QuestTracker 
+      {/* Quest Tracker - Top Right (z-20 so it stays visible when panels open) */}
+      <div className="absolute top-24 right-4 left-4 md:left-auto md:w-64 pointer-events-auto z-20">
+        <QuestTracker
           activeQuest={activeQuest}
+          activeMissionCount={(activeQuestNpcId || expandedQuestNpcId) ? 1 : 0}
           onQuestClick={() => {
             if (activeQuest?.objectives.some(o => o.requiresPhoto && !o.completed)) {
               setShowPhotoProof(true)
@@ -567,26 +595,26 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         />
       </div>
 
-      {/* Micro Quest Card - Bottom Sheet Style on Mobile */}
-      {showMicroQuest && selectedNPC?.microQuest && (
-        <div className="absolute bottom-20 left-4 right-4 md:bottom-24 md:left-auto md:right-4 md:w-80 pointer-events-auto z-20">
-          <QuestCard
-            quest={selectedNPC.microQuest}
-            onComplete={handleMicroQuestComplete}
-            onPhotoCapture={() => setShowPhotoProof(true)}
-            isSubmitting={isSubmitting}
-          />
-          {/* Close button */}
-          <button
-            onClick={() => setShowMicroQuest(false)}
-            className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <span className="text-xs">x</span>
-          </button>
-        </div>
+      {/* Trophies Panel - Completed tasks and badges */}
+      {activeTab === "achievements" && (
+        <TrophiesTab />
       )}
 
-      {/* Quests Panel - Shows all nearby task cards */}
+      {/* Profile Panel - Your Character (same style as other tabs, no pop-up) */}
+      {activeTab === "profile" && (
+        <ProfileTab
+          playerStats={{
+            level: playerStats.level,
+            xp: playerStats.xp,
+            maxXp: playerStats.maxXp,
+            questsCompleted: playerStats.questsCompleted,
+            milesWalked: playerStats.milesWalked,
+            streak: playerStats.streak,
+          }}
+        />
+      )}
+
+      {/* Quests Panel - Task content only here, never as a pop-up on the map */}
       {activeTab === "quests" && (
         <div className="absolute bottom-24 left-0 right-0 max-h-[60vh] overflow-y-auto pointer-events-auto z-25 bg-background/95 backdrop-blur-md border-t border-border">
           <div className="p-4">
@@ -595,44 +623,155 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
               <span className="text-xs font-mono text-primary">{npcs.length} available</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {npcs.map((npc) => (
-                <button
-                  key={npc.id}
-                  onClick={() => handleNPCCardSelect(npc.id)}
-                  className={`w-full rounded-lg transition-all duration-200 text-left ${
-                    selectedNPC?.id === npc.id 
-                      ? "border-2 border-primary bg-primary/5" 
-                      : "border border-border bg-card/80 hover:border-primary/50"
-                  }`}
-                >
-                  <div className="flex items-stretch">
-                    <div className="relative w-16 h-16 flex-shrink-0 rounded-l-lg overflow-hidden">
-                      <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-                        <span className="text-xl font-mono font-bold text-primary">
-                          {npc.avatarInitial}
-                        </span>
-                      </div>
-                      <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-background/90 backdrop-blur-sm">
-                        <span className="text-[7px] font-mono text-primary uppercase font-bold">
-                          {npc.microQuest?.type === "photo" ? "Photo" : npc.microQuest?.type === "yes_no" ? "Survey" : "Verify"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex-1 p-2 flex flex-col justify-between min-w-0">
-                      <div>
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <h4 className="text-xs font-mono font-bold text-foreground truncate">{npc.name}</h4>
-                          <span className="text-[9px] font-mono text-primary">+{npc.microQuest?.reward?.xp || 50} XP</span>
+              {npcs.map((npc) => {
+                const isActive = activeQuestNpcId === npc.id
+                const isExpanded = expandedQuestNpcId === npc.id
+                return (
+                  <div
+                    key={npc.id}
+                    className={`w-full rounded-lg transition-all duration-200 overflow-hidden ${
+                      isActive
+                        ? "border-2 border-neon-green bg-neon-green/5 shadow-[0_0_12px_var(--neon-green)]"
+                        : "border border-border bg-card/80 hover:border-primary/50"
+                    }`}
+                  >
+                    <button
+                      className="w-full text-left"
+                      onClick={() => handleNPCCardSelect(npc.id)}
+                    >
+                      <div className="flex items-stretch">
+                        <div className="relative w-16 h-16 flex-shrink-0 rounded-l-lg overflow-hidden">
+                          <div className={`w-full h-full bg-gradient-to-br flex items-center justify-center ${isActive ? "from-neon-green/20 to-neon-green/10" : "from-muted/30 to-muted/20"}`}>
+                            <span className={`text-xl font-mono font-bold ${isActive ? "text-neon-green" : "text-muted-foreground"}`}>
+                              {npc.avatarInitial}
+                            </span>
+                          </div>
+                          <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-background/90 backdrop-blur-sm">
+                            <span className={`text-[7px] font-mono uppercase font-bold ${isActive ? "text-neon-green" : "text-muted-foreground"}`}>
+                              {npc.microQuest?.type === "photo" ? "Photo" : npc.microQuest?.type === "yes_no" ? "Survey" : npc.microQuest?.type === "description" ? "Description" : "Verify"}
+                            </span>
+                          </div>
                         </div>
-                        <p className="text-[9px] font-mono text-primary uppercase tracking-wide truncate">{npc.title}</p>
+                        <div className="flex-1 p-2 flex flex-col justify-between min-w-0">
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <h4 className="text-xs font-mono font-bold text-foreground truncate">{npc.name}</h4>
+                              <span className={`text-[9px] font-mono ${isActive ? "text-neon-green" : "text-muted-foreground"}`}>+{npc.microQuest?.reward?.xp || 50} XP</span>
+                            </div>
+                            <p className="text-[9px] font-mono text-primary uppercase tracking-wide truncate">{npc.title}</p>
+                          </div>
+                          <p className="text-[9px] font-mono text-muted-foreground line-clamp-1 leading-tight">
+                            {npc.microQuest?.description || npc.quest?.description || "No active task"}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-[9px] font-mono text-muted-foreground line-clamp-1 leading-tight">
-                        {npc.microQuest?.description || npc.quest?.description || "No active task"}
-                      </p>
-                    </div>
+                    </button>
+                    {/* Inline quest content when expanded - part of task card, no pop-up */}
+                    {isExpanded && npc.microQuest && (
+                      <div className="border-t border-neon-green/30 bg-neon-green/5 p-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] font-mono text-neon-green uppercase tracking-widest">
+                            {npc.microQuest.type === "photo" ? "Upload Photo" : npc.microQuest.type === "yes_no" ? "Survey" : npc.microQuest.type === "description" ? "Description" : "Task"}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-neon-green">+{npc.microQuest.reward.xp} XP</span>
+                        </div>
+                        <p className="text-xs font-mono text-foreground/90 leading-relaxed">{npc.microQuest.description}</p>
+                        {npc.microQuest.question && (
+                          <div className="bg-neon-green/10 rounded-lg p-2 border border-neon-green/30">
+                            <p className="text-xs font-mono text-foreground text-center">{npc.microQuest.question}</p>
+                          </div>
+                        )}
+                        {npc.microQuest.hint && (
+                          <p className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> {npc.microQuest.hint}
+                          </p>
+                        )}
+                        <div className="space-y-2">
+                          {npc.microQuest.type === "photo" && (
+                            <Button
+                              className="w-full h-9 font-mono text-xs bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                              onClick={() => { setSelectedNPC(npc); setShowPhotoProof(true) }}
+                              disabled={isSubmitting}
+                            >
+                              <Camera className="w-3.5 h-3.5 mr-2" />
+                              {isSubmitting ? "Uploading..." : "Upload Photo"}
+                            </Button>
+                          )}
+                          {npc.microQuest.type === "yes_no" && (
+                            <div className="flex gap-2">
+                              <Button
+                                className={`flex-1 h-9 font-mono text-xs border ${questPanelYesNo[npc.id] === true ? "bg-neon-green/30 border-neon-green text-neon-green" : "bg-neon-green/10 border-neon-green/50 text-neon-green hover:bg-neon-green/20"}`}
+                                onClick={() => { setQuestPanelYesNo((a) => ({ ...a, [npc.id]: true })); handleMicroQuestComplete(true, npc) }}
+                                disabled={isSubmitting || questPanelYesNo[npc.id] !== undefined}
+                              >
+                                <Check className="w-3.5 h-3.5 mr-1.5" /> Yes
+                              </Button>
+                              <Button
+                                className={`flex-1 h-9 font-mono text-xs border ${questPanelYesNo[npc.id] === false ? "bg-destructive/30 border-destructive text-destructive" : "bg-destructive/10 border-destructive/50 text-destructive hover:bg-destructive/20"}`}
+                                onClick={() => { setQuestPanelYesNo((a) => ({ ...a, [npc.id]: false })); handleMicroQuestComplete(false, npc) }}
+                                disabled={isSubmitting || questPanelYesNo[npc.id] !== undefined}
+                              >
+                                <X className="w-3.5 h-3.5 mr-1.5" /> No
+                              </Button>
+                            </div>
+                          )}
+                          {npc.microQuest.type === "description" && (
+                            <>
+                              <div className="rounded-lg border border-neon-green/30 bg-background/50 p-2">
+                                <Textarea
+                                  placeholder="Type your answer..."
+                                  value={questPanelDescription[npc.id] ?? ""}
+                                  onChange={(e) => setQuestPanelDescription((a) => ({ ...a, [npc.id]: e.target.value }))}
+                                  className="min-h-[80px] text-xs font-mono resize-none border-0 bg-transparent placeholder:text-muted-foreground/60 focus-visible:ring-0"
+                                  disabled={isSubmitting}
+                                />
+                              </div>
+                              <Button
+                                className="w-full h-9 font-mono text-xs bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                                onClick={() => {
+                                  const text = questPanelDescription[npc.id]?.trim()
+                                  if (text) handleMicroQuestComplete(text, npc)
+                                }}
+                                disabled={isSubmitting || !(questPanelDescription[npc.id]?.trim())}
+                              >
+                                <Check className="w-3.5 h-3.5 mr-2" />
+                                Submit
+                              </Button>
+                            </>
+                          )}
+                          {(npc.microQuest.type === "confirm" || npc.microQuest.type === "location") && (
+                            <Button
+                              className="w-full h-9 font-mono text-xs bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                              onClick={() => handleMicroQuestComplete(true, npc)}
+                              disabled={isSubmitting}
+                            >
+                              <Check className="w-3.5 h-3.5 mr-2" /> {npc.microQuest.type === "location" ? "I'm Here" : "Confirm"}
+                            </Button>
+                          )}
+                        </div>
+                        {npc.microQuest.reward.blockProgress && (
+                          <div className="pt-2 border-t border-neon-green/30 flex justify-between text-[10px] font-mono text-muted-foreground">
+                            <span>Block Progress</span>
+                            <span className="text-neon-green">+{npc.microQuest.reward.blockProgress}%</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setActiveQuestNpcId((prev) => (prev === npc.id ? null : npc.id))}
+                      className={`w-full py-2 px-2 border-t flex items-center justify-center gap-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+                        isActive
+                          ? "border-neon-green/40 bg-neon-green/15 text-neon-green"
+                          : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      }`}
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      {isActive ? "Active" : "Activate"}
+                    </button>
                   </div>
-                </button>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
@@ -640,11 +779,10 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
 
       {/* Bottom Action Bar */}
       <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-auto z-30">
-        <ActionBar 
+        <ActionBar
           activeTab={activeTab}
           onTabChange={handleTabChange}
           questCount={npcs.length}
-          newAchievements={2}
         />
       </div>
 
@@ -702,12 +840,12 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         onClose={() => !isSubmitting && setShowPhotoProof(false)}
         onSubmit={handlePhotoSubmit}
         objective={
-          showMicroQuest && selectedNPC?.microQuest?.type === "photo"
+          selectedNPC?.microQuest?.type === "photo"
             ? selectedNPC.microQuest.title
             : activeQuest?.objectives.find(o => o.requiresPhoto)?.text || "Take a photo"
         }
         hint={
-          showMicroQuest && selectedNPC?.microQuest?.hint
+          selectedNPC?.microQuest?.hint
             ? selectedNPC.microQuest.hint
             : "Make sure the target is clearly visible in frame"
         }
@@ -735,7 +873,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
 
           {/* NPC Cards Strip - Bottom 1/4 */}
           <div className="relative bg-background/95 backdrop-blur-md border-t border-border pt-3 pb-6">
-            <NPCCardStrip 
+            <NPCCardStrip
               npcs={npcs.map(npc => ({
                 id: npc.id,
                 name: npc.name,
@@ -743,10 +881,21 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
                 avatarInitial: npc.avatarInitial,
                 trustLevel: npc.trustLevel || 50,
                 taskPreview: npc.microQuest?.description || npc.quest?.description || "No active task",
-                taskType: npc.microQuest?.type === "photo" ? "photo" : npc.microQuest?.type === "yes_no" ? "yes_no" : "confirm"
+                taskType: npc.microQuest?.type === "photo" ? "photo" : npc.microQuest?.type === "yes_no" ? "yes_no" : npc.microQuest?.type === "description" ? "description" : "confirm",
+                microQuest: npc.microQuest,
+                imageUrl: npc.character?.imageUrl
               }))}
               onNPCSelect={handleNPCCardSelect}
               selectedNPCId={selectedNPC?.id}
+              activeNPCId={activeQuestNpcId}
+              onActivate={(npcId) => setActiveQuestNpcId((prev) => (prev === npcId ? null : npcId))}
+              expandedNPCId={expandedQuestNpcId}
+              onPhotoCapture={() => setShowPhotoProof(true)}
+              onQuestComplete={(npcId, answer) => {
+                const npc = npcs.find(n => n.id === npcId)
+                if (npc) handleMicroQuestComplete(answer, npc)
+              }}
+              isSubmitting={isSubmitting}
             />
           </div>
         </div>
@@ -771,20 +920,6 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
           chatMessages={chatMessages}
         />
       )}
-
-      {/* Player Profile */}
-      <PlayerProfile
-        isOpen={activeTab === "profile"}
-        onClose={() => setActiveTab("map")}
-        playerStats={{
-          level: playerStats.level,
-          xp: playerStats.xp,
-          maxXp: playerStats.maxXp,
-          questsCompleted: 23,
-          milesWalked: playerStats.milesWalked,
-          streak: playerStats.streak
-        }}
-      />
 
       {/* Reward Animation */}
       <RewardAnimation

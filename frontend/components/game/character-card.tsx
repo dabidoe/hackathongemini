@@ -56,6 +56,7 @@ export function CharacterCard({
   const [inputValue, setInputValue] = useState("")
   const [displayedText, setDisplayedText] = useState("")
   const [isAnimating, setIsAnimating] = useState(false)
+  const [isQuestActive, setIsQuestActive] = useState(false)
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
   // Typewriter effect for initial message
@@ -288,13 +289,22 @@ export function CharacterCard({
                 </Button>
               </div>
 
-              {/* Quest Button */}
+              {/* Quest Button - lights up neon green and shows Active when started */}
               <Button
-                onClick={onStartQuest}
-                className="w-full h-10 font-mono text-xs bg-primary/20 border border-primary text-primary hover:bg-primary/30"
+                onClick={() => {
+                  if (!isQuestActive) {
+                    setIsQuestActive(true)
+                    onStartQuest?.()
+                  }
+                }}
+                className={`w-full h-10 font-mono text-xs transition-all duration-300 ${
+                  isQuestActive
+                    ? "bg-neon-green/25 border-neon-green text-neon-green shadow-[0_0_12px_var(--neon-green)] hover:bg-neon-green/30"
+                    : "bg-primary/20 border border-primary text-primary hover:bg-primary/30"
+                }`}
               >
-                <Star className="w-4 h-4 mr-2" />
-                Start Quest
+                <Star className={`w-4 h-4 mr-2 ${isQuestActive ? "fill-neon-green" : ""}`} />
+                {isQuestActive ? "Active" : "Start Quest"}
               </Button>
             </div>
           )}

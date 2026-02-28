@@ -68,17 +68,17 @@ export function QuestCard({
 
   return (
     <GlassPanel 
-      className="p-3"
+      className="p-3 border-2 border-neon-green/40 bg-neon-green/5"
       variant="strong"
-      glowColor={quest.type === "photo" ? "magenta" : "cyan"}
+      glowColor="green"
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
-        <div className={`w-8 h-8 rounded-lg bg-background/50 border border-border flex items-center justify-center`}>
-          <Icon className={`w-4 h-4 ${config.iconColor}`} />
+        <div className="w-8 h-8 rounded-lg bg-neon-green/20 border border-neon-green/40 flex items-center justify-center">
+          <Icon className="w-4 h-4 text-neon-green" />
         </div>
         <div className="flex-1">
-          <span className={`text-[9px] font-mono ${config.iconColor} uppercase tracking-widest`}>
+          <span className="text-[9px] font-mono text-neon-green uppercase tracking-widest">
             {config.label}
           </span>
           <h3 className="text-sm font-mono text-foreground font-medium -mt-0.5 line-clamp-1">
@@ -97,7 +97,7 @@ export function QuestCard({
 
       {/* Quest Question (for yes/no) */}
       {quest.question && (
-        <div className="bg-muted/30 rounded-lg p-2 mb-3 border border-border">
+        <div className="bg-neon-green/10 rounded-lg p-2 mb-3 border border-neon-green/30">
           <p className="text-xs font-mono text-foreground text-center">
             {quest.question}
           </p>
@@ -121,7 +121,7 @@ export function QuestCard({
             disabled={isSubmitting}
           >
             <Camera className="w-4 h-4 mr-2" />
-            {isSubmitting ? "Uploading..." : "Take Photo"}
+            {isSubmitting ? "Uploading..." : "Upload Photo"}
           </Button>
         )}
 
@@ -179,9 +179,9 @@ export function QuestCard({
 
       {/* Reward Preview */}
       {quest.reward.blockProgress && (
-        <div className="mt-3 pt-2 border-t border-border flex items-center justify-between">
+        <div className="mt-3 pt-2 border-t border-neon-green/30 flex items-center justify-between">
           <span className="text-[10px] font-mono text-muted-foreground">Block Progress</span>
-          <span className="text-[10px] font-mono text-primary">+{quest.reward.blockProgress}%</span>
+          <span className="text-[10px] font-mono text-neon-green">+{quest.reward.blockProgress}%</span>
         </div>
       )}
     </GlassPanel>

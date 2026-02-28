@@ -1,29 +1,26 @@
 "use client"
 
-import { Map, User, Trophy, Settings, Compass } from "lucide-react"
+import { Map, User, Trophy, Compass } from "lucide-react"
 import { GlassPanel } from "./glass-panel"
 
-type Tab = "map" | "quests" | "profile" | "achievements" | "settings"
+type Tab = "map" | "quests" | "profile" | "achievements"
 
 interface ActionBarProps {
   activeTab: Tab
   onTabChange: (tab: Tab) => void
   questCount?: number
-  newAchievements?: number
 }
 
 export function ActionBar({ 
   activeTab, 
   onTabChange,
-  questCount = 0,
-  newAchievements = 0
+  questCount = 0
 }: ActionBarProps) {
   const tabs: { id: Tab; icon: typeof Map; label: string; badge?: number }[] = [
     { id: "map", icon: Compass, label: "Map" },
     { id: "quests", icon: Map, label: "Quests", badge: questCount },
     { id: "profile", icon: User, label: "Profile" },
-    { id: "achievements", icon: Trophy, label: "Trophies", badge: newAchievements },
-    { id: "settings", icon: Settings, label: "Settings" },
+    { id: "achievements", icon: Trophy, label: "Trophies" },
   ]
 
   const handleClick = (tab: Tab) => (e: React.MouseEvent) => {

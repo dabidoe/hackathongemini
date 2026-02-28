@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { User, AlertCircle, HelpCircle, Star } from "lucide-react"
+import { Landmark, AlertCircle, HelpCircle, Star } from "lucide-react"
 
 type MarkerType = "npc" | "quest" | "mystery" | "completed"
 
@@ -14,9 +14,9 @@ interface MapMarkerProps {
   style?: React.CSSProperties
 }
 
-export function MapMarker({ 
-  type, 
-  name, 
+export function MapMarker({
+  type,
+  name,
   distance,
   isActive = false,
   onClick,
@@ -28,7 +28,7 @@ export function MapMarker({
     npc: {
       bg: "bg-primary/20",
       border: "border-primary",
-      icon: User,
+      icon: Landmark,
       iconColor: "text-primary",
       glow: "glow-cyan"
     },
@@ -59,7 +59,7 @@ export function MapMarker({
   const Icon = styles.icon
 
   return (
-    <div 
+    <div
       className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer"
       style={style}
       onClick={onClick}
@@ -68,19 +68,23 @@ export function MapMarker({
     >
       {/* Pulse ring for active/quest markers */}
       {(isActive || type === "quest") && (
-        <div className={`absolute inset-0 ${styles.bg} rounded-full animate-ping opacity-75`} 
-             style={{ animationDuration: '2s' }} />
+        <div
+          className={`absolute inset-0 ${styles.bg} rounded-full animate-ping opacity-75`}
+          style={{ animationDuration: "2s" }}
+        />
       )}
-      
+
       {/* Main marker */}
-      <div className={`
-        relative w-10 h-10 rounded-full 
+      <div
+        className={`
+        relative w-10 h-10 rounded-full
         ${styles.bg} ${styles.border} border-2
         flex items-center justify-center
         transition-transform duration-200
-        ${isActive ? styles.glow : ''}
-        ${isHovered ? 'scale-110' : ''}
-      `}>
+        ${isActive ? styles.glow : ""}
+        ${isHovered ? "scale-110" : ""}
+      `}
+      >
         <Icon className={`w-5 h-5 ${styles.iconColor}`} />
       </div>
 
@@ -91,7 +95,7 @@ export function MapMarker({
             <span className="text-xs font-mono text-foreground block">{name}</span>
             {distance !== undefined && (
               <span className="text-[10px] font-mono text-muted-foreground">
-                {distance < 1000 ? `${distance}m` : `${(distance/1000).toFixed(1)}km`}
+                {distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(1)}km`}
               </span>
             )}
           </div>
@@ -99,13 +103,15 @@ export function MapMarker({
       )}
 
       {/* Direction indicator (pointer) */}
-      <div className={`
+      <div
+        className={`
         absolute top-full left-1/2 -translate-x-1/2 -mt-1
-        w-0 h-0 
+        w-0 h-0
         border-l-[6px] border-l-transparent
         border-r-[6px] border-r-transparent
-        border-t-[8px] ${styles.border.replace('border', 'border-t')}
-      `} />
+        border-t-[8px] ${styles.border.replace("border", "border-t")}
+      `}
+      />
     </div>
   )
 }

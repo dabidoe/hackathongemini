@@ -197,7 +197,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     const handleNPCSelected = (event: Event) => {
       const customEvent = event as CustomEvent<LeafletNPCPayload>
       const payload = customEvent.detail
-      
+
       // Find matching NPC from our demo data or create one from payload
       const matchedNPC = npcs.find(npc => npc.id === payload.npcId)
       if (matchedNPC) {
@@ -210,7 +210,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     const handleNPCCardSelected = (event: Event) => {
       const customEvent = event as CustomEvent<{ npcId: string }>
       const { npcId } = customEvent.detail
-      
+
       const matchedNPC = npcs.find(npc => npc.id === npcId)
       if (matchedNPC) {
         setSelectedNPC(matchedNPC)
@@ -221,7 +221,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
 
     window.addEventListener("npc:selected", handleNPCSelected)
     window.addEventListener("npc:card:selected", handleNPCCardSelected)
-    
+
     return () => {
       window.removeEventListener("npc:selected", handleNPCSelected)
       window.removeEventListener("npc:card:selected", handleNPCCardSelected)
@@ -273,7 +273,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
       }
     },
     {
-      id: "2", 
+      id: "2",
       name: "NOVA",
       title: "Tech Scavenger",
       avatarInitial: "N",
@@ -449,7 +449,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
   const triggerReward = useCallback((reward: { xp: number; blockProgress?: number; message?: string; type?: "success" | "achievement" | "level_up" }) => {
     setCurrentReward(reward)
     setShowReward(true)
-    
+
     // Update player stats
     setPlayerStats(prev => ({
       ...prev,
@@ -629,9 +629,9 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
   const handleMicroQuestComplete = async (answer: string | boolean, npcOverride?: NPC | null) => {
     const npc = npcOverride ?? selectedNPC
     if (!npc?.microQuest) return
-    
+
     setIsSubmitting(true)
-    
+
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       const token = await getIdToken()
@@ -670,8 +670,8 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
 
         // Emit quest completion to Leaflet map
         window.dispatchEvent(new CustomEvent("quest:completed", {
-          detail: { 
-            placeId: npc.id, 
+          detail: {
+            placeId: npc.id,
             status: "approved",
             xpAwarded: data.xpAwarded,
             blockDelta: data.blockDelta
@@ -755,12 +755,12 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     }
 
     setIsSubmitting(true)
-    
+
     try {
-      const questId = selectedNPC?.microQuest 
-        ? selectedNPC.microQuest.id 
+      const questId = selectedNPC?.microQuest
+        ? selectedNPC.microQuest.id
         : activeQuest?.id || "photo-quest"
-      
+
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       const token = await getIdToken()
       if (token) headers["Authorization"] = `Bearer ${token}`
@@ -795,7 +795,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         if (activeQuest) {
           const updatedQuest = {
             ...activeQuest,
-            objectives: activeQuest.objectives.map(obj => 
+            objectives: activeQuest.objectives.map(obj =>
               obj.requiresPhoto ? { ...obj, completed: true } : obj
             )
           }
@@ -811,8 +811,8 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
 
         // Emit to Leaflet
         window.dispatchEvent(new CustomEvent("quest:completed", {
-          detail: { 
-            placeId: selectedNPC?.id, 
+          detail: {
+            placeId: selectedNPC?.id,
             status: "approved",
             xpAwarded: data.xpAwarded
           }
@@ -924,18 +924,15 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
 
       {/* Top HUD */}
       <div className="absolute top-0 left-0 right-0 p-4 pointer-events-auto">
-        <StatusBar 
+        <StatusBar
           playerName="RUNNER_X7"
           level={playerStats.level}
           xp={playerStats.xp}
           maxXp={playerStats.maxXp}
           streak={playerStats.streak}
           questsCompleted={playerStats.questsCompleted}
-<<<<<<< Updated upstream
           onProfileClick={() => setActiveTab("profile")}
-=======
           profileImageUrl={profileImageUrl}
->>>>>>> Stashed changes
         />
       </div>
 
@@ -1019,9 +1016,8 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
                   return (
                     <div
                       key={placeId}
-                      className={`w-full rounded-lg transition-all duration-200 overflow-hidden border ${
-                        allDone ? "border-neon-green/50 bg-neon-green/5" : "border-border bg-card/80 hover:border-primary/50"
-                      }`}
+                      className={`w-full rounded-lg transition-all duration-200 overflow-hidden border ${allDone ? "border-neon-green/50 bg-neon-green/5" : "border-border bg-card/80 hover:border-primary/50"
+                        }`}
                     >
                       <div className="flex items-center justify-between p-3">
                         <div>
@@ -1142,15 +1138,15 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
           pendingLocationPhotoTask?.type === "photo"
             ? pendingLocationPhotoTask.description
             : selectedNPC?.microQuest?.type === "photo"
-            ? selectedNPC.microQuest.title
-            : activeQuest?.objectives.find(o => o.requiresPhoto)?.text || "Take a photo"
+              ? selectedNPC.microQuest.title
+              : activeQuest?.objectives.find(o => o.requiresPhoto)?.text || "Take a photo"
         }
         hint={
           pendingLocationPhotoTask?.hint
             ? pendingLocationPhotoTask.hint
             : selectedNPC?.microQuest?.hint
-            ? selectedNPC.microQuest.hint
-            : "Make sure the target is clearly visible in frame"
+              ? selectedNPC.microQuest.hint
+              : "Make sure the target is clearly visible in frame"
         }
         isSubmitting={isSubmitting}
       />
@@ -1160,9 +1156,9 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         <div className="fixed inset-0 z-40 flex flex-col pointer-events-auto">
           {/* Full-screen Location Display (background) */}
           <div className="absolute inset-0">
-            <LocationDisplay 
+            <LocationDisplay
               location={currentLocation}
-              onLocationChange={() => {}}
+              onLocationChange={() => { }}
             />
           </div>
 
@@ -1252,91 +1248,91 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
                         </div>
                         {/* Full task detail (always visible for every card) */}
                         <div className="px-3 pb-3 border-t border-border/60 space-y-2">
-                            <p className="pt-2 text-[10px] font-mono text-foreground leading-snug">
-                              {task.description}
+                          <p className="pt-2 text-[10px] font-mono text-foreground leading-snug">
+                            {task.description}
+                          </p>
+                          {task.question && (
+                            <p className="text-[10px] font-mono text-foreground/90 italic">
+                              {task.question}
                             </p>
-                            {task.question && (
-                              <p className="text-[10px] font-mono text-foreground/90 italic">
-                                {task.question}
-                              </p>
+                          )}
+                          {task.hint && (
+                            <p className="text-[9px] font-mono text-muted-foreground flex items-center gap-1">
+                              <Clock className="w-3 h-3 shrink-0" /> {task.hint}
+                            </p>
+                          )}
+                          <div className="space-y-2 pt-1">
+                            {!isCompleted && task.type === "photo" && (
+                              <Button
+                                className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                                onClick={() => {
+                                  setPendingLocationPhotoTask(task)
+                                  setShowPhotoProof(true)
+                                  setSelectedLocationTask(null)
+                                }}
+                                disabled={isSubmitting}
+                              >
+                                <Camera className="w-3 h-3 mr-2" />
+                                {isSubmitting ? "Uploading..." : "Upload Photo"}
+                              </Button>
                             )}
-                            {task.hint && (
-                              <p className="text-[9px] font-mono text-muted-foreground flex items-center gap-1">
-                                <Clock className="w-3 h-3 shrink-0" /> {task.hint}
-                              </p>
-                            )}
-                            <div className="space-y-2 pt-1">
-                              {!isCompleted && task.type === "photo" && (
+                            {!isCompleted && task.type === "yes_no" && (
+                              <div className="flex gap-2">
                                 <Button
-                                  className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
-                                  onClick={() => {
-                                    setPendingLocationPhotoTask(task)
-                                    setShowPhotoProof(true)
-                                    setSelectedLocationTask(null)
-                                  }}
-                                  disabled={isSubmitting}
-                                >
-                                  <Camera className="w-3 h-3 mr-2" />
-                                  {isSubmitting ? "Uploading..." : "Upload Photo"}
-                                </Button>
-                              )}
-                              {!isCompleted && task.type === "yes_no" && (
-                                <div className="flex gap-2">
-                                  <Button
-                                    className="flex-1 h-9 font-mono text-[10px] bg-neon-green/10 border border-neon-green/50 text-neon-green hover:bg-neon-green/20"
-                                    onClick={() => handleLocationTaskComplete(task, true)}
-                                    disabled={isSubmitting}
-                                  >
-                                    <Check className="w-3 h-3 mr-1" /> Yes
-                                  </Button>
-                                  <Button
-                                    className="flex-1 h-9 font-mono text-[10px] bg-destructive/10 border border-destructive/50 text-destructive hover:bg-destructive/20"
-                                    onClick={() => handleLocationTaskComplete(task, false)}
-                                    disabled={isSubmitting}
-                                  >
-                                    <X className="w-3 h-3 mr-1" /> No
-                                  </Button>
-                                </div>
-                              )}
-                              {!isCompleted && task.type === "description" && (
-                                <>
-                                  <Textarea
-                                    placeholder="Type your answer..."
-                                    value={questPanelDescription[taskKey] ?? ""}
-                                    onChange={(e) =>
-                                      setQuestPanelDescription((a) => ({ ...a, [taskKey]: e.target.value }))
-                                    }
-                                    className="min-h-[72px] text-[10px] font-mono resize-none border border-neon-green/30 bg-background/50"
-                                    disabled={isSubmitting}
-                                  />
-                                  <Button
-                                    className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
-                                    onClick={() => {
-                                      const text = questPanelDescription[taskKey]?.trim()
-                                      if (text) handleLocationTaskComplete(task, text)
-                                    }}
-                                    disabled={isSubmitting || !(questPanelDescription[taskKey]?.trim())}
-                                  >
-                                    <Check className="w-3 h-3 mr-2" /> Submit
-                                  </Button>
-                                </>
-                              )}
-                              {!isCompleted && (task.type === "confirm" || task.type === "location") && (
-                                <Button
-                                  className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                                  className="flex-1 h-9 font-mono text-[10px] bg-neon-green/10 border border-neon-green/50 text-neon-green hover:bg-neon-green/20"
                                   onClick={() => handleLocationTaskComplete(task, true)}
                                   disabled={isSubmitting}
                                 >
-                                  <Check className="w-3 h-3 mr-2" /> {task.type === "location" ? "I'm Here" : "Confirm"}
+                                  <Check className="w-3 h-3 mr-1" /> Yes
                                 </Button>
-                              )}
-                              {!isCompleted && task.reward.blockProgress && (
-                                <p className="text-[9px] font-mono text-neon-green">
-                                  +{task.reward.blockProgress}% block
-                                </p>
-                              )}
-                            </div>
+                                <Button
+                                  className="flex-1 h-9 font-mono text-[10px] bg-destructive/10 border border-destructive/50 text-destructive hover:bg-destructive/20"
+                                  onClick={() => handleLocationTaskComplete(task, false)}
+                                  disabled={isSubmitting}
+                                >
+                                  <X className="w-3 h-3 mr-1" /> No
+                                </Button>
+                              </div>
+                            )}
+                            {!isCompleted && task.type === "description" && (
+                              <>
+                                <Textarea
+                                  placeholder="Type your answer..."
+                                  value={questPanelDescription[taskKey] ?? ""}
+                                  onChange={(e) =>
+                                    setQuestPanelDescription((a) => ({ ...a, [taskKey]: e.target.value }))
+                                  }
+                                  className="min-h-[72px] text-[10px] font-mono resize-none border border-neon-green/30 bg-background/50"
+                                  disabled={isSubmitting}
+                                />
+                                <Button
+                                  className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                                  onClick={() => {
+                                    const text = questPanelDescription[taskKey]?.trim()
+                                    if (text) handleLocationTaskComplete(task, text)
+                                  }}
+                                  disabled={isSubmitting || !(questPanelDescription[taskKey]?.trim())}
+                                >
+                                  <Check className="w-3 h-3 mr-2" /> Submit
+                                </Button>
+                              </>
+                            )}
+                            {!isCompleted && (task.type === "confirm" || task.type === "location") && (
+                              <Button
+                                className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                                onClick={() => handleLocationTaskComplete(task, true)}
+                                disabled={isSubmitting}
+                              >
+                                <Check className="w-3 h-3 mr-2" /> {task.type === "location" ? "I'm Here" : "Confirm"}
+                              </Button>
+                            )}
+                            {!isCompleted && task.reward.blockProgress && (
+                              <p className="text-[9px] font-mono text-neon-green">
+                                +{task.reward.blockProgress}% block
+                              </p>
+                            )}
                           </div>
+                        </div>
                       </div>
                     )
                   })}
@@ -1354,7 +1350,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
           onClose={() => setShowCharacterCard(false)}
           character={selectedNPC.character}
           initialMessage={
-            selectedNPC.microQuest 
+            selectedNPC.microQuest
               ? `Hey there, I'm ${selectedNPC.name}. ${selectedNPC.microQuest.description}`
               : selectedNPC.quest
                 ? `Connection established. ${selectedNPC.quest.description}. Are you ready?`
@@ -1375,7 +1371,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
       />
 
       {/* Notifications */}
-      <NotificationStack 
+      <NotificationStack
         notifications={notifications}
         onDismiss={dismissNotification}
       />

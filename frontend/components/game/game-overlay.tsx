@@ -130,6 +130,8 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     reward: { xp: number; blockProgress?: number }
   }>>([])
   const [locationReplacementTasks, setLocationReplacementTasks] = useState<typeof locationTasks>([])
+  const [locationReviewTasks, setLocationReviewTasks] = useState<typeof locationTasks>([])
+  const [locationReviewIntel, setLocationReviewIntel] = useState<{ consensusSummary: string } | null>(null)
   const [locationTasksLoading, setLocationTasksLoading] = useState(false)
   const [selectedLocationTask, setSelectedLocationTask] = useState<(typeof locationTasks)[0] | null>(null)
   const [taskImageErrors, setTaskImageErrors] = useState<Set<string>>(new Set())
@@ -371,6 +373,8 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     if (!selectedHotspot) {
       setLocationTasks([])
       setLocationReplacementTasks([])
+      setLocationReviewTasks([])
+      setLocationReviewIntel(null)
       return
     }
     setLocationTasksLoading(true)
@@ -383,6 +387,8 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         if (Array.isArray(data.tasks)) {
           setLocationTasks(data.tasks)
           setLocationReplacementTasks(Array.isArray(data.replacementTasks) ? data.replacementTasks : [])
+          setLocationReviewTasks(Array.isArray(data.reviewTasks) ? data.reviewTasks : [])
+          setLocationReviewIntel(data.reviewIntel?.consensusSummary ? { consensusSummary: data.reviewIntel.consensusSummary } : null)
           setVisitedPlaceIds((prev) => {
             const next = new Set(prev)
             next.add(placeId)
@@ -405,11 +411,15 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         } else {
           setLocationTasks([])
           setLocationReplacementTasks([])
+          setLocationReviewTasks([])
+          setLocationReviewIntel(null)
         }
       })
       .catch(() => {
         setLocationTasks([])
         setLocationReplacementTasks([])
+        setLocationReviewTasks([])
+        setLocationReviewIntel(null)
       })
       .finally(() => setLocationTasksLoading(false))
   }, [selectedHotspot?.place_id])
@@ -936,6 +946,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
           questsCompleted={playerStats.questsCompleted}
           onProfileClick={() => setActiveTab("profile")}
           profileImageUrl={profileImageUrl}
+          onSignInError={(message) => addNotification({ type: "warning", title: "Sign-in failed", message })}
         />
       </div>
 
@@ -1182,9 +1193,19 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
               <h3 className="text-xs font-mono font-bold text-foreground uppercase tracking-wider mb-3 shrink-0">
                 Tasks at {selectedHotspot?.name}
               </h3>
+              {locationReviewIntel?.consensusSummary && (
+                <div className="w-full max-w-4xl mb-3 px-2 py-2 rounded-lg bg-background/60 backdrop-blur border border-border">
+                  <h4 className="text-[10px] font-mono font-bold text-primary uppercase tracking-wider mb-1">
+                    Review Intel
+                  </h4>
+                  <p className="text-[10px] font-mono text-muted-foreground line-clamp-2">
+                    {locationReviewIntel.consensusSummary}
+                  </p>
+                </div>
+              )}
               {locationTasksLoading ? (
                 <p className="text-xs font-mono text-muted-foreground">Loading tasks...</p>
-              ) : locationTasks.length === 0 ? (
+              ) : locationTasks.length === 0 && locationReviewTasks.length === 0 ? (
                 <p className="text-xs font-mono text-muted-foreground">No tasks at this location.</p>
               ) : (
                 <div className="grid grid-cols-4 gap-2 w-full max-w-4xl">
@@ -1250,6 +1271,150 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
                           </p>
                         </div>
                         {/* Full task detail (always visible for every card) */}
+                        <div className="px-3 pb-3 border-t border-border/60 space-y-2">
+                          <p className="pt-2 text-[10px] font-mono text-foreground leading-snug">
+                            {task.description}
+                          </p>
+                          {task.question && (
+                            <p className="text-[10px] font-mono text-foreground/90 italic">
+                              {task.question}
+                            </p>
+                          )}
+                          {task.hint && (
+                            <p className="text-[9px] font-mono text-muted-foreground flex items-center gap-1">
+                              <Clock className="w-3 h-3 shrink-0" /> {task.hint}
+                            </p>
+                          )}
+                          <div className="space-y-2 pt-1">
+                            {!isCompleted && task.type === "photo" && (
+                              <Button
+                                className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                                onClick={() => {
+                                  setPendingLocationPhotoTask(task)
+                                  setShowPhotoProof(true)
+                                  setSelectedLocationTask(null)
+                                }}
+                                disabled={isSubmitting}
+                              >
+                                <Camera className="w-3 h-3 mr-2" />
+                                {isSubmitting ? "Uploading..." : "Upload Photo"}
+                              </Button>
+                            )}
+                            {!isCompleted && task.type === "yes_no" && (
+                              <div className="flex gap-2">
+                                <Button
+                                  className="flex-1 h-9 font-mono text-[10px] bg-neon-green/10 border border-neon-green/50 text-neon-green hover:bg-neon-green/20"
+                                  onClick={() => handleLocationTaskComplete(task, true)}
+                                  disabled={isSubmitting}
+                                >
+                                  <Check className="w-3 h-3 mr-1" /> Yes
+                                </Button>
+                                <Button
+                                  className="flex-1 h-9 font-mono text-[10px] bg-destructive/10 border border-destructive/50 text-destructive hover:bg-destructive/20"
+                                  onClick={() => handleLocationTaskComplete(task, false)}
+                                  disabled={isSubmitting}
+                                >
+                                  <X className="w-3 h-3 mr-1" /> No
+                                </Button>
+                              </div>
+                            )}
+                            {!isCompleted && task.type === "description" && (
+                              <>
+                                <Textarea
+                                  placeholder="Type your answer..."
+                                  value={questPanelDescription[taskKey] ?? ""}
+                                  onChange={(e) =>
+                                    setQuestPanelDescription((a) => ({ ...a, [taskKey]: e.target.value }))
+                                  }
+                                  className="min-h-[72px] text-[10px] font-mono resize-none border border-neon-green/30 bg-background/50"
+                                  disabled={isSubmitting}
+                                />
+                                <Button
+                                  className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                                  onClick={() => {
+                                    const text = questPanelDescription[taskKey]?.trim()
+                                    if (text) handleLocationTaskComplete(task, text)
+                                  }}
+                                  disabled={isSubmitting || !(questPanelDescription[taskKey]?.trim())}
+                                >
+                                  <Check className="w-3 h-3 mr-2" /> Submit
+                                </Button>
+                              </>
+                            )}
+                            {!isCompleted && (task.type === "confirm" || task.type === "location") && (
+                              <Button
+                                className="w-full h-9 font-mono text-[10px] bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30"
+                                onClick={() => handleLocationTaskComplete(task, true)}
+                                disabled={isSubmitting}
+                              >
+                                <Check className="w-3 h-3 mr-2" /> {task.type === "location" ? "I'm Here" : "Confirm"}
+                              </Button>
+                            )}
+                            {!isCompleted && task.reward.blockProgress && (
+                              <p className="text-[9px] font-mono text-neon-green">
+                                +{task.reward.blockProgress}% block
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {locationReviewTasks.map((task) => {
+                    const placeId = selectedHotspot?.place_id ?? ""
+                    const isCompleted = (completedLocationTasks[placeId] ?? []).includes(task.characterId)
+                    const taskKey = `${placeId}-${task.characterId}`
+                    const taskTypeLabel = task.type === "photo" ? "Photo" : task.type === "yes_no" ? "Survey" : task.type === "description" ? "Description" : "Task"
+                    return (
+                      <div
+                        key={taskKey}
+                        className={`relative w-full min-w-0 rounded-xl overflow-hidden border-2 bg-background/85 backdrop-blur-md shadow-lg ${isCompleted ? "border-neon-green/50" : "border-border"}`}
+                      >
+                        {isCompleted && (
+                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/40 backdrop-blur-sm">
+                            <div className="flex flex-col items-center gap-1">
+                              <Check className="w-10 h-10 text-neon-green" strokeWidth={2.5} />
+                              <span className="text-xs font-mono font-bold text-neon-green uppercase">Completed</span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="relative w-full aspect-[3/4] overflow-hidden bg-gradient-to-br from-muted/40 to-muted/20">
+                          {task.imageUrl && !taskImageErrors.has(taskKey) ? (
+                            <Image
+                              src={task.imageUrl}
+                              alt={task.name}
+                              fill
+                              className="object-cover object-top"
+                              sizes="(max-width: 768px) 50vw, 360px"
+                              unoptimized={task.imageUrl.startsWith("/")}
+                              onError={() => setTaskImageErrors((s) => new Set(s).add(taskKey))}
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-2xl font-mono font-bold text-muted-foreground">
+                                {task.avatarInitial}
+                              </span>
+                            </div>
+                          )}
+                          <div className="absolute left-2 bottom-2 px-2 py-1 rounded-md bg-background/80 backdrop-blur border border-border">
+                            <span className="text-[10px] font-mono uppercase font-bold text-foreground">
+                              {taskTypeLabel}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="text-xs font-mono font-bold text-foreground truncate">
+                              {task.name}
+                            </h4>
+                            <span className="text-[11px] font-mono font-semibold text-primary shrink-0">
+                              +{task.reward.xp} XP
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[10px] font-mono text-muted-foreground line-clamp-2">
+                            {task.title}
+                          </p>
+                        </div>
                         <div className="px-3 pb-3 border-t border-border/60 space-y-2">
                           <p className="pt-2 text-[10px] font-mono text-foreground leading-snug">
                             {task.description}

@@ -15,6 +15,8 @@ interface StatusBarProps {
   questsCompleted?: number
   onProfileClick?: () => void
   profileImageUrl?: string | null
+  /** Called when sign-in fails (e.g. Firebase not configured, popup blocked). */
+  onSignInError?: (message: string) => void
 }
 
 function xpToLevel(xp: number): { level: number; maxXp: number } {
@@ -31,7 +33,8 @@ export function StatusBar({
   streak = 0,
   questsCompleted = 0,
   onProfileClick,
-  profileImageUrl = null
+  profileImageUrl = null,
+  onSignInError,
 }: StatusBarProps) {
   const { user, loading, signInWithGoogle, signOut, getIdToken } = useAuth()
   const [userXp, setUserXp] = useState<number | null>(null)
@@ -76,6 +79,9 @@ export function StatusBar({
     setIsSigningIn(true)
     try {
       await signInWithGoogle()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Sign-in failed"
+      onSignInError?.(message)
     } finally {
       setIsSigningIn(false)
     }

@@ -48,10 +48,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const auth = getFirebaseAuth();
     if (!auth) {
       console.warn("Firebase Auth not configured");
-      return;
+      throw new Error("Sign-in is not configured. Add Firebase env vars (NEXT_PUBLIC_FIREBASE_*) to .env.local.");
     }
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("popup") || message.includes("cancelled")) {
+        throw new Error("Sign-in was cancelled or blocked. Allow popups and try again.");
+      }
+      if (message.includes("network") || message.includes("auth/")) {
+        throw new Error("Sign-in failed. Check your connection and try again.");
+      }
+      throw err;
+    }
   }, []);
 
   const signOut = useCallback(async () => {

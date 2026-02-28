@@ -2,14 +2,18 @@
  * Returns task config for a place. Checks Firestore placeTaskConfig first;
  * falls back to default tasks with placeName interpolated.
  * Uses Place Details API to derive questions (accessibility, business status, place type).
+ * Merges Gemini-generated review-intel tasks (4–8) when reviews exist.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCharactersForPlace } from "@/lib/characters";
 import { fetchPlaceDetails, type PlaceDetailsData } from "@/lib/place-details";
+import { fetchPlaceReviews } from "@/lib/place-reviews";
+import { getReviewIntel } from "@/lib/gemini/reviewIntel";
+import type { ReviewIntelTask } from "@/lib/review-intel-types";
 
 export interface PlaceTask {
-  characterId: "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8";
+  characterId: string; // "1".."8" baseline, "9".."16" review tasks
   type: "photo" | "yes_no" | "description" | "confirm" | "location";
   title: string;
   description: string;
@@ -167,8 +171,32 @@ export async function GET(
       replacementTasks = defaults.replacementTasks;
     }
 
-    // Get 8 characters for this location (4 initial + 4 replacement)
-    const placeCharacters = getCharactersForPlace(placeId, 8);
+    // Review intel: fetch reviews, get Gemini consensus + tasks, merge into response
+    let reviewTasks: PlaceTask[] = [];
+    let reviewIntel: { consensusSummary: string } | undefined;
+    try {
+      const { oneStar, fiveStar } = await fetchPlaceReviews(placeId);
+      if (oneStar.length > 0 || fiveStar.length > 0) {
+        const intel = await getReviewIntel(placeId, placeName, oneStar, fiveStar);
+        if (intel.consensusSummary.trim()) reviewIntel = { consensusSummary: intel.consensusSummary };
+        if (intel.tasksToVerify.length > 0) {
+          reviewTasks = intel.tasksToVerify.slice(0, 8).map((t: ReviewIntelTask, i: number) => ({
+            characterId: String(9 + i),
+            type: t.type,
+            title: "Review check",
+            description: t.claim || t.question,
+            question: t.question,
+            hint: t.evidenceQuotes?.[0] ? `Review: "${t.evidenceQuotes[0].slice(0, 60)}..."` : undefined,
+            reward: { xp: 12, blockProgress: 2 },
+          }));
+        }
+      }
+    } catch (reviewErr) {
+      console.warn("Review intel unavailable, using baseline tasks only:", reviewErr);
+    }
+
+    // Get up to 16 characters (8 baseline + 8 review slots)
+    const placeCharacters = getCharactersForPlace(placeId, 16);
     const charIndex = (id: string) => Math.min(Math.max(0, parseInt(id, 10) - 1), placeCharacters.length - 1);
 
     const withMeta = (t: PlaceTask) => ({
@@ -183,12 +211,15 @@ export async function GET(
 
     const tasksWithMeta = tasks.map(withMeta);
     const replacementWithMeta = replacementTasks.map(withMeta);
+    const reviewTasksWithMeta = reviewTasks.map(withMeta);
 
     return NextResponse.json({
       placeId,
       placeName,
       tasks: tasksWithMeta,
       replacementTasks: replacementWithMeta,
+      reviewTasks: reviewTasksWithMeta,
+      ...(reviewIntel && { reviewIntel }),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Tasks API error";

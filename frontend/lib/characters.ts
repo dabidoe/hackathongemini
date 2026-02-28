@@ -86,8 +86,9 @@ function toCharacterMeta(c: JsonCharacter, index: number): CharacterMeta {
 }
 
 /**
- * Get up to 8 characters for a location, deterministically assigned based on placeId.
- * Same placeId always returns the same characters. Used for 4 initial + 4 replacement slots.
+ * Get up to count characters for a location, deterministically assigned based on placeId.
+ * Same placeId always returns the same characters. Used for baseline (8) + review tasks (16 total).
+ * If count > pool size, cycles through the shuffled pool so every slot gets a character from the pool.
  */
 export function getCharactersForPlace(placeId: string, count = 8): CharacterMeta[] {
   const all = getCharacters()
@@ -98,11 +99,14 @@ export function getCharactersForPlace(placeId: string, count = 8): CharacterMeta
       { name: "CIPHER", title: "Accessibility Scout", avatarInitial: "C", imageUrl: "/characters/cipher.jpg" },
       { name: "ECHO", title: "Street Historian", avatarInitial: "E", imageUrl: "/characters/echo.jpg" },
     ]
-    return [...defaults, ...defaults].slice(0, count)
+    const repeated = []
+    for (let i = 0; i < count; i++) repeated.push(defaults[i % defaults.length])
+    return repeated
   }
 
   const seed = hashString(placeId)
   const shuffled = seededShuffle(all.length, seed)
-  const indices = shuffled.slice(0, count)
+  const indices: number[] = []
+  for (let i = 0; i < count; i++) indices.push(shuffled[i % shuffled.length])
   return indices.map((i) => toCharacterMeta(all[i], i))
 }

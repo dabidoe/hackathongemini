@@ -82,7 +82,7 @@ export function MapMarker({
       {/* Pulse ring for active/quest/player markers */}
       {(isActive || type === "quest" || type === "player") && (
         <div
-          className={`absolute inset-0 w-14 h-14 rounded-full ${styles.bg} animate-ping opacity-75`}
+          className={`absolute inset-0 w-10 h-10 rounded-full ${styles.bg} animate-ping opacity-75`}
           style={{ animationDuration: "2s" }}
         />
       )}
@@ -90,7 +90,7 @@ export function MapMarker({
       {/* Main marker */}
       <div
         className={`
-        relative w-14 h-14 rounded-full
+        relative w-10 h-10 rounded-full
         ${styles.bg} ${styles.border} border-2
         flex items-center justify-center overflow-hidden
         transition-transform duration-200
@@ -103,8 +103,8 @@ export function MapMarker({
           <Image
             src={avatarUrl}
             alt="You"
-            width={56}
-            height={56}
+            width={40}
+            height={40}
             className="w-full h-full object-cover"
             unoptimized={avatarUrl.startsWith("blob:") || avatarUrl.startsWith("data:") || avatarUrl.includes("picsum")}
           />
@@ -112,12 +112,12 @@ export function MapMarker({
           <Image
             src={placeImageUrl}
             alt={name}
-            width={56}
-            height={56}
+            width={40}
+            height={40}
             className="w-full h-full object-cover"
           />
         ) : (
-          <Icon className={`w-6 h-6 ${styles.iconColor}`} />
+          <Icon className={`w-4 h-4 ${styles.iconColor}`} />
         )}
       </div>
 

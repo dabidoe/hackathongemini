@@ -16,9 +16,13 @@ interface ProfileTabProps {
     streak: number
   }
   onClose?: () => void
+  /** Saved profile portrait (used across the app). Shown when opening the tab. */
+  profileImageUrl?: string | null
+  /** Call when user generates a new portrait so it can be saved and used app-wide. */
+  onProfileImageSave?: (dataUrl: string) => void
 }
 
-export function ProfileTab({ playerStats, onClose }: ProfileTabProps) {
+export function ProfileTab({ playerStats, onClose, profileImageUrl = null, onProfileImageSave }: ProfileTabProps) {
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null)
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null)
   const [selectedChips, setSelectedChips] = useState<SelectedChips>({})
@@ -28,7 +32,7 @@ export function ProfileTab({ playerStats, onClose }: ProfileTabProps) {
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const displayImageUrl = generatedImageUrl ?? sourceImageUrl
+  const displayImageUrl = generatedImageUrl ?? sourceImageUrl ?? profileImageUrl ?? null
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -83,21 +87,27 @@ export function ProfileTab({ playerStats, onClose }: ProfileTabProps) {
     if (!sourceImageUrl) return
     setIsGenerating(true)
     setGenerateError(null)
+    const style = selectedChips.theme === "Cyberpunk" ? "cyberpunk" : "fantasy"
     try {
-      const res = await fetch("/api/generate-character", {
+      // Upload image + style → Gemini (fantasy/cyberpunk prompts) → base64 or URL
+      const res = await fetch("/api/generate-portrait", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: sourceImageUrl,
-          chips: selectedChips,
-        }),
+        body: JSON.stringify({ imageUrl: sourceImageUrl, style }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setGenerateError(data?.error ?? data?.message ?? "Failed to generate")
         return
       }
-      if (data?.imageUrl) setGeneratedImageUrl(data.imageUrl)
+      // Prefer base64 so we can show the image immediately without a second request
+      const dataUrl = data.generatedBase64
+        ? `data:image/png;base64,${data.generatedBase64}`
+        : data.imageUrl ?? null
+      if (dataUrl) {
+        setGeneratedImageUrl(dataUrl)
+        if (dataUrl.startsWith("data:")) onProfileImageSave?.(dataUrl)
+      }
     } catch {
       setGenerateError("Connection error")
     } finally {
@@ -152,7 +162,9 @@ export function ProfileTab({ playerStats, onClose }: ProfileTabProps) {
                 height={427}
                 className="w-full h-full object-cover"
                 unoptimized={
-                  displayImageUrl.startsWith("blob:") || displayImageUrl.includes("picsum")
+                  displayImageUrl.startsWith("blob:") ||
+                  displayImageUrl.startsWith("data:") ||
+                  displayImageUrl.includes("picsum")
                 }
               />
             ) : (
@@ -173,8 +185,11 @@ export function ProfileTab({ playerStats, onClose }: ProfileTabProps) {
             onChange={handleFileInputChange}
           />
 
-          {/* Chips - right side on larger screens */}
+          {/* Theme only: Fantasy or Cyberpunk → sent to Gemini */}
           <div className="flex-1 w-full md:min-w-0 space-y-4 p-4 rounded-lg border-2 border-primary/50 bg-background/60 backdrop-blur-sm">
+            <p className="text-[10px] font-mono text-muted-foreground">
+              Pick <strong className="text-foreground">Fantasy</strong> or <strong className="text-foreground">Cyberpunk</strong>, then Regenerate. Your photo is sent to Gemini and a styled portrait is shown below.
+            </p>
             <ProfileChips chips={selectedChips} onChange={setSelectedChips} />
             <Button
               size="sm"
@@ -225,7 +240,7 @@ export function ProfileTab({ playerStats, onClose }: ProfileTabProps) {
         </div>
 
         <p className="text-[9px] font-mono text-foreground/90 text-center pb-2">
-          AI_GENERATED // NANO_BANANA
+          AI_GENERATED // GEMINI
         </p>
       </div>
     </div>

@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { Map, User, Trophy, Compass } from "lucide-react"
 import { GlassPanel } from "./glass-panel"
 
@@ -9,12 +10,14 @@ interface ActionBarProps {
   activeTab: Tab
   onTabChange: (tab: Tab) => void
   questCount?: number
+  profileImageUrl?: string | null
 }
 
 export function ActionBar({ 
   activeTab, 
   onTabChange,
-  questCount = 0
+  questCount = 0,
+  profileImageUrl = null
 }: ActionBarProps) {
   const tabs: { id: Tab; icon: typeof Map; label: string; badge?: number }[] = [
     { id: "map", icon: Compass, label: "Map" },
@@ -35,6 +38,7 @@ export function ActionBar({
         {tabs.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
+          const showProfileImage = tab.id === "profile" && profileImageUrl
 
           return (
             <button
@@ -52,7 +56,20 @@ export function ActionBar({
                 }
               `}
             >
-              <Icon className={`w-5 h-5 md:w-5 md:h-5 ${isActive ? '' : ''}`} />
+              {showProfileImage ? (
+                <div className="w-6 h-6 rounded-full overflow-hidden border border-primary/50 flex-shrink-0">
+                  <Image
+                    src={profileImageUrl}
+                    alt="Profile"
+                    width={24}
+                    height={24}
+                    className="w-full h-full object-cover"
+                    unoptimized={profileImageUrl.startsWith("data:")}
+                  />
+                </div>
+              ) : (
+                <Icon className={`w-5 h-5 md:w-5 md:h-5 ${isActive ? '' : ''}`} />
+              )}
               <span className="text-[9px] md:text-[10px] font-mono mt-0.5 uppercase tracking-wide">
                 {tab.label}
               </span>

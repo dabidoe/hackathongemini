@@ -14,6 +14,7 @@ interface StatusBarProps {
   streak?: number
   questsCompleted?: number
   onProfileClick?: () => void
+  profileImageUrl?: string | null
 }
 
 function xpToLevel(xp: number): { level: number; maxXp: number } {
@@ -30,6 +31,7 @@ export function StatusBar({
   streak = 0,
   questsCompleted = 0,
   onProfileClick,
+  profileImageUrl = null
 }: StatusBarProps) {
   const { user, loading, signInWithGoogle, signOut, getIdToken } = useAuth()
   const [userXp, setUserXp] = useState<number | null>(null)
@@ -89,21 +91,33 @@ export function StatusBar({
           role={onProfileClick ? "button" : undefined}
           aria-label={onProfileClick ? "Open profile" : undefined}
         >
-          <div className="relative">
-            {user?.photoURL ? (
+          <div className="relative flex-shrink-0">
+            {profileImageUrl ? (
+              <>
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-primary bg-primary/20">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={profileImageUrl}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border border-background" title={`Level ${displayLevel}`} />
+              </>
+            ) : user?.photoURL ? (
               <img
                 src={user.photoURL}
                 alt=""
                 className="w-8 h-8 rounded-full border border-primary object-cover"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary flex items-center justify-center">
-                <span className="text-xs font-mono text-primary font-bold">
-                  {displayLevel}
-                </span>
-              </div>
+              <>
+                <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary flex items-center justify-center">
+                  <span className="text-xs font-mono text-primary font-bold">{displayLevel}</span>
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border border-background" />
+              </>
             )}
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border border-background" />
           </div>
           <div className="flex flex-col">
             <span className="text-xs font-mono text-foreground/90 uppercase tracking-wider">

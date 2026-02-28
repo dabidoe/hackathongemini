@@ -1,23 +1,10 @@
 "use client"
 
 export const THEME_OPTIONS = ["Fantasy", "Cyberpunk"] as const
-export const CLASS_OPTIONS = ["Warrior", "Mage", "Rogue", "Healer"] as const
-export const EYE_OPTIONS = ["Blue", "Green", "Brown", "Amber", "Silver"] as const
-export const HAIR_OPTIONS = ["Black", "Brown", "Blonde", "Silver", "Red"] as const
-export const HAT_OPTIONS = ["None", "Hood", "Helmet", "Crown", "Cap"] as const
-
 export type ThemeOption = (typeof THEME_OPTIONS)[number]
-export type ClassOption = (typeof CLASS_OPTIONS)[number]
-export type EyeOption = (typeof EYE_OPTIONS)[number]
-export type HairOption = (typeof HAIR_OPTIONS)[number]
-export type HatOption = (typeof HAT_OPTIONS)[number]
 
 export interface SelectedChips {
   theme?: ThemeOption
-  class?: ClassOption
-  eyeColor?: EyeOption
-  hairColor?: HairOption
-  hat?: HatOption
 }
 
 interface ChipGroupProps<T extends string> {
@@ -64,30 +51,6 @@ export function ProfileChips({ chips, onChange }: ProfileChipsProps) {
         options={THEME_OPTIONS}
         value={chips.theme}
         onChange={(v) => onChange({ ...chips, theme: v })}
-      />
-      <ChipGroup
-        label="Class"
-        options={CLASS_OPTIONS}
-        value={chips.class}
-        onChange={(v) => onChange({ ...chips, class: v })}
-      />
-      <ChipGroup
-        label="Eye color"
-        options={EYE_OPTIONS}
-        value={chips.eyeColor}
-        onChange={(v) => onChange({ ...chips, eyeColor: v })}
-      />
-      <ChipGroup
-        label="Hair color"
-        options={HAIR_OPTIONS}
-        value={chips.hairColor}
-        onChange={(v) => onChange({ ...chips, hairColor: v })}
-      />
-      <ChipGroup
-        label="Hat / Accessory"
-        options={HAT_OPTIONS}
-        value={chips.hat}
-        onChange={(v) => onChange({ ...chips, hat: v })}
       />
     </div>
   )

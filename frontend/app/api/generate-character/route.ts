@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 
+// Exact style prompts (fantasy / cyberpunk) for nanobanana image-to-image
 const FANTASY_BASE =
-  "high resolution fantasy character portrait, 8k, layered environmental depth, dramatic cinematic lighting, mysterious timeless mood, saturated yet natural fantasy palette, in the style of Greg Rutkowski, Ruan Jia, Marc Simonetti"
+  "high resolution fantasy image, 8k, layered environmental depth, dramatic cinematic lighting, mysterious timeless mood, saturated yet natural fantasy palette, in the style of inspired by Greg Rutkowski, Ruan Jia, Marc Simonetti"
 
 const CYBERPUNK_BASE =
-  "cyberpunk character portrait, near-future dystopian tone, moody neon undertones, high contrast lighting, cybernetic, subtle holographic glow, atmospheric haze, volumetric light beams, deep shadows, cinematic color grading, sharp detail, immersive high-tech atmosphere"
+  "cyberpunk aesthetic, near-future dystopian tone, moody neon undertones, high contrast lighting, cybernetic, subtle holographic glow, atmospheric haze, volumetric light beams, deep shadows, cinematic color grading, sharp detail, immersive high-tech atmosphere"
 
 interface Chips {
   theme?: string
@@ -22,7 +23,7 @@ function buildPromptFromThemeAndChips(theme: string, chips: Chips): string {
   if (chips.hairColor) parts.push(`${chips.hairColor.toLowerCase()} hair`)
   if (chips.hat && chips.hat !== "None") parts.push(`wearing ${chips.hat.toLowerCase()}`)
   const suffix = parts.length ? ", " + parts.join(", ") : ""
-  return `Transform this portrait into a ${base}${suffix}. Keep the person's face and identity recognizable.`
+  return `Character portrait: transform this photo into ${base}${suffix}. Keep the person's face and identity recognizable.`
 }
 
 const NANO_BANANA_BASE = "https://nanobananapro.cloud/api/v1/image/nano-banana"
@@ -133,17 +134,28 @@ export async function POST(request: NextRequest) {
       const immediateResults = submitData?.data?.results
       const immediateUrl = Array.isArray(immediateResults) && immediateResults[0]?.url ? immediateResults[0].url : null
 
+      const useFirebase =
+        !!process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim() ||
+        !!process.env.FIREBASE_SERVICE_ACCOUNT?.trim()
+
       if (immediateUrl) {
+        if (!useFirebase) {
+          return NextResponse.json({ success: true, imageUrl: immediateUrl, prompt: builtPrompt, message: "Character portrait generated successfully" })
+        }
         const imgRes = await fetch(immediateUrl)
         if (imgRes.ok) {
-          const imageData = Buffer.from(await imgRes.arrayBuffer())
-          const { getStorageBucket } = await import("@/lib/firebase-admin")
-          const bucket = getStorageBucket()
-          const path = `profile-portraits/${Date.now()}-${Math.random().toString(36).slice(2)}.png`
-          const file = bucket.file(path)
-          await file.save(imageData, { metadata: { contentType: "image/png" } })
-          const [url] = await file.getSignedUrl({ action: "read", expires: "03-01-2500" })
-          return NextResponse.json({ success: true, imageUrl: url, prompt: builtPrompt, message: "Character portrait generated successfully" })
+          try {
+            const imageData = Buffer.from(await imgRes.arrayBuffer())
+            const { getStorageBucket } = await import("@/lib/firebase-admin")
+            const bucket = getStorageBucket()
+            const path = `profile-portraits/${Date.now()}-${Math.random().toString(36).slice(2)}.png`
+            const file = bucket.file(path)
+            await file.save(imageData, { metadata: { contentType: "image/png" } })
+            const [url] = await file.getSignedUrl({ action: "read", expires: "03-01-2500" })
+            return NextResponse.json({ success: true, imageUrl: url, prompt: builtPrompt, message: "Character portrait generated successfully" })
+          } catch (firebaseErr) {
+            return NextResponse.json({ success: true, imageUrl: immediateUrl, prompt: builtPrompt, message: "Character portrait generated successfully" })
+          }
         }
       }
 
@@ -161,27 +173,43 @@ export async function POST(request: NextRequest) {
       if (!imgRes.ok) {
         throw new Error("Failed to fetch generated image")
       }
+
+      if (!useFirebase) {
+        return NextResponse.json({
+          success: true,
+          imageUrl: result.url,
+          prompt: builtPrompt,
+          message: "Character portrait generated successfully",
+        })
+      }
+
       const imageData = Buffer.from(await imgRes.arrayBuffer())
-
-      const { getStorageBucket } = await import("@/lib/firebase-admin")
-      const bucket = getStorageBucket()
-      const path = `profile-portraits/${Date.now()}-${Math.random().toString(36).slice(2)}.png`
-      const file = bucket.file(path)
-      await file.save(imageData, {
-        metadata: { contentType: "image/png" },
-      })
-
-      const [url] = await file.getSignedUrl({
-        action: "read",
-        expires: "03-01-2500",
-      })
-
-      return NextResponse.json({
-        success: true,
-        imageUrl: url,
-        prompt: builtPrompt,
-        message: "Character portrait generated successfully",
-      })
+      try {
+        const { getStorageBucket } = await import("@/lib/firebase-admin")
+        const bucket = getStorageBucket()
+        const path = `profile-portraits/${Date.now()}-${Math.random().toString(36).slice(2)}.png`
+        const file = bucket.file(path)
+        await file.save(imageData, {
+          metadata: { contentType: "image/png" },
+        })
+        const [url] = await file.getSignedUrl({
+          action: "read",
+          expires: "03-01-2500",
+        })
+        return NextResponse.json({
+          success: true,
+          imageUrl: url,
+          prompt: builtPrompt,
+          message: "Character portrait generated successfully",
+        })
+      } catch (firebaseErr) {
+        return NextResponse.json({
+          success: true,
+          imageUrl: result.url,
+          prompt: builtPrompt,
+          message: "Character portrait generated successfully",
+        })
+      }
     } catch (genError) {
       throw genError
     }

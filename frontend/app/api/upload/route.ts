@@ -1,26 +1,29 @@
 /**
  * Image upload API route.
- * Accepts image file or base64, uploads to Firebase Storage, returns public URL.
+ * Stores uploads in memory and returns a temp URL. Used by the profile tab so
+ * the image can be sent to Gemini (no Firebase).
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { createTempId, saveTempImage } from "@/lib/temp-image-store"
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
 
-function getExtension(mimeType: string): string {
-  if (mimeType === "image/jpeg" || mimeType === "image/jpg") return "jpg"
-  if (mimeType === "image/png") return "png"
-  if (mimeType === "image/webp") return "webp"
-  return "jpg"
+function getOrigin(request: NextRequest): string {
+  return (
+    request.nextUrl?.origin ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    "http://localhost:3000"
+  )
 }
 
 export async function POST(request: NextRequest) {
+  let buffer: Buffer
+  let mimeType: string
+
   try {
     const contentType = request.headers.get("content-type") ?? ""
-
-    let buffer: Buffer
-    let mimeType: string
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData()
@@ -63,32 +66,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    const { getStorageBucket } = await import("@/lib/firebase-admin")
-    const bucket = getStorageBucket()
-    const ext = getExtension(mimeType)
-    const path = `quest-photos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-
-    const file = bucket.file(path)
-    await file.save(buffer, {
-      metadata: { contentType: mimeType },
-    })
-
-    const [url] = await file.getSignedUrl({
-      action: "read",
-      expires: "03-01-2500", // 1 year from now
-    })
-
-    return NextResponse.json({ url })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Upload failed"
-    const isBucketError =
-      msg.includes("bucket does not exist") ||
-      (err as { code?: number })?.code === 404
-    const message = isBucketError
-      ? "Firebase Storage bucket not found. Enable Storage in Firebase Console: Project → Storage → Get started"
-      : msg
-    console.error("Upload error:", err)
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error("Upload parse error:", err)
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 })
   }
+
+  // Temp store only (no Firebase). Image is used by /api/generate-portrait → Gemini.
+  const id = createTempId()
+  saveTempImage(id, buffer, mimeType)
+  const origin = getOrigin(request)
+  const url = `${origin}/api/temp-image?id=${id}`
+  return NextResponse.json({ url })
 }

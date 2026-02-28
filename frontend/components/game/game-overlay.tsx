@@ -93,11 +93,13 @@ interface GameOverlayProps {
 }
 
 const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&q=80"
+const PROFILE_PORTRAIT_KEY = "app_profile_portrait"
 
 export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
   const mapContext = useMapContextOptional()
   const { user, getIdToken } = useAuth()
   const [activeTab, setActiveTab] = useState<"map" | "quests" | "profile" | "achievements">("map")
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null)
   const [activeQuest, setActiveQuest] = useState<Quest | null>(null)
   const [showNPCDialog, setShowNPCDialog] = useState(false)
   const [showPhotoProof, setShowPhotoProof] = useState(false)
@@ -150,6 +152,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
   }>>(() => [])
 
   useEffect(() => {
+    if (typeof window === "undefined") return
     try {
       const storedIds = localStorage.getItem("visitedPlaceIds")
       if (storedIds) {
@@ -165,7 +168,16 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         const parsed = JSON.parse(storedHistory)
         if (Array.isArray(parsed)) setCompletedTaskHistory(parsed)
       }
+      const saved = localStorage.getItem(PROFILE_PORTRAIT_KEY)
+      if (saved) setProfileImageUrl(saved)
     } catch { /* ignore */ }
+  }, [])
+
+  const handleProfileImageSave = useCallback((dataUrl: string) => {
+    setProfileImageUrl(dataUrl)
+    try {
+      localStorage.setItem(PROFILE_PORTRAIT_KEY, dataUrl)
+    } catch { /* quota or other */ }
   }, [])
 
   // Player stats
@@ -919,7 +931,11 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
           maxXp={playerStats.maxXp}
           streak={playerStats.streak}
           questsCompleted={playerStats.questsCompleted}
+<<<<<<< Updated upstream
           onProfileClick={() => setActiveTab("profile")}
+=======
+          profileImageUrl={profileImageUrl}
+>>>>>>> Stashed changes
         />
       </div>
 
@@ -958,6 +974,8 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
             milesWalked: playerStats.milesWalked,
             streak: playerStats.streak,
           }}
+          profileImageUrl={profileImageUrl}
+          onProfileImageSave={handleProfileImageSave}
         />
       )}
 
@@ -1058,6 +1076,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
           activeTab={activeTab}
           onTabChange={handleTabChange}
           questCount={visitedPlaceIds.size}
+          profileImageUrl={profileImageUrl}
         />
       </div>
 

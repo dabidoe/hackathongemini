@@ -1,0 +1,4 @@
+# Gemini AI integration files - always use ours on merge conflicts
+frontend/lib/npc.ts merge=ours
+frontend/app/api/npc/message/route.ts merge=ours
+frontend/.env.local merge=ours

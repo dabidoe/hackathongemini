@@ -46,8 +46,8 @@ function buildUserPrompt(placeName: string, oneStar: ReviewLite[], fiveStar: Rev
 }
 
 async function callGemini(placeName: string, oneStar: ReviewLite[], fiveStar: ReviewLite[]): Promise<ReviewIntelOutput> {
-  const apiKey = process.env.GOOGLE_CLOUD_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
-  if (!apiKey) throw new Error("GOOGLE_CLOUD_API_KEY or GOOGLE_API_KEY is not set");
+  const apiKey = process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_CLOUD_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
 
   const ai = new GoogleGenAI({ apiKey });
   const userPrompt = buildUserPrompt(placeName, oneStar, fiveStar);

@@ -2,9 +2,14 @@
  * Server route for Google Places API.
  * Keeps API key server-side; accepts lat, lng, radiusMeters.
  * Caches results in Firestore for 24h for faster loads.
+ * Also supports POST with anchorName for geocoded nearby search.
  */
 
 import { NextRequest, NextResponse } from "next/server";
+
+export const runtime = "nodejs";
+
+const RADIUS_METERS = 1600; // ~1 mile
 
 export interface PlaceResult {
   place_id: string;
@@ -14,6 +19,10 @@ export interface PlaceResult {
   rating?: number;
   user_ratings_total?: number;
   types?: string[];
+  reviews?: Array<{ author_name: string; text: string; rating: number }>;
+  opening_hours?: { open_now?: boolean };
+  business_status?: string;
+  price_level?: number;
 }
 
 interface NearbySearchResponse {
@@ -89,6 +98,58 @@ async function fetchAndMergePlaces(
     }
   }
   return places;
+}
+
+// --- Geocoding anchor → lat/lng ---
+async function geocode(anchor: string): Promise<{ lat: number; lng: number }> {
+  const key = process.env.GOOGLE_PLACES_API_KEY;
+  const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+  url.searchParams.set("address", anchor);
+  url.searchParams.set("key", key!);
+  const res = await fetch(url.toString());
+  const data = await res.json();
+  const loc = data.results?.[0]?.geometry?.location;
+  if (!loc) throw new Error(`Geocode failed for: ${anchor}`);
+  return { lat: loc.lat, lng: loc.lng };
+}
+
+// --- Place details including reviews ---
+async function fetchDetails(placeId: string): Promise<Partial<PlaceResult>> {
+  const key = process.env.GOOGLE_PLACES_API_KEY;
+  const url = new URL("https://maps.googleapis.com/maps/api/place/details/json");
+  url.searchParams.set("place_id", placeId);
+  url.searchParams.set(
+    "fields",
+    ["place_id", "name", "types", "rating", "user_ratings_total",
+      "opening_hours", "business_status", "price_level", "reviews", "geometry",
+    ].join(",")
+  );
+  url.searchParams.set("key", key!);
+  const res = await fetch(url.toString());
+  const data = await res.json();
+  return data.result ?? {};
+}
+
+// --- POST: lat/lng based search with reviews ---
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { anchorName, lat: rawLat, lng: rawLng } = body
+    const lat = parseFloat(rawLat)
+    const lng = parseFloat(rawLng)
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return NextResponse.json({ error: "lat and lng are required" }, { status: 400 })
+    }
+
+    const nearby = await fetchAndMergePlaces(lat, lng, RADIUS_METERS)
+    const top = nearby.slice(0, 20)
+    const detailed = await Promise.all(top.map((p) => fetchDetails(p.place_id)))
+    const places = top.map((p, i) => ({ ...p, ...detailed[i] })).filter(Boolean)
+    return NextResponse.json({ anchor: { anchorName: anchorName ?? "Current Location", lat, lng }, places })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message ?? "Unknown error" }, { status: 500 })
+  }
 }
 
 export async function GET(request: NextRequest) {

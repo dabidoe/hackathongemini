@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import { Zap, Camera, Check, X, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -17,6 +17,21 @@ import { NPCCardStrip } from "./npc-card-strip"
 import { CharacterCard } from "./character-card"
 import { ProfileTab } from "./profile-tab"
 import { TrophiesTab } from "./trophies-tab"
+import { useMapContextOptional } from "@/contexts/map-context"
+import { haversineMeters } from "@/lib/geo"
+import type { PlaceResult } from "@/app/api/places/route"
+
+function latLngToPercent(
+  lat: number,
+  lng: number,
+  bounds: google.maps.LatLngBounds
+): { x: number; y: number } {
+  const ne = bounds.getNorthEast()
+  const sw = bounds.getSouthWest()
+  const x = ((lng - sw.lng()) / (ne.lng() - sw.lng())) * 100
+  const y = ((ne.lat() - lat) / (ne.lat() - sw.lat())) * 100
+  return { x, y }
+}
 
 // Leaflet integration event payload type
 interface LeafletNPCPayload {
@@ -75,7 +90,10 @@ interface GameOverlayProps {
   onMarkerTap?: (markerId: string) => void
 }
 
+const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&q=80"
+
 export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
+  const mapContext = useMapContextOptional()
   const [activeTab, setActiveTab] = useState<"map" | "quests" | "profile" | "achievements">("map")
   const [activeQuest, setActiveQuest] = useState<Quest | null>(null)
   const [showNPCDialog, setShowNPCDialog] = useState(false)
@@ -84,17 +102,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
   const [showCharacterCard, setShowCharacterCard] = useState(false)
   const [showLocationScreen, setShowLocationScreen] = useState(false)
   const [currentReward, setCurrentReward] = useState<{ xp: number; blockProgress?: number; message?: string; type?: "success" | "achievement" | "level_up" } | null>(null)
-  
-  // Demo location data for the selected NPC's location
-  const [currentLocation] = useState({
-    id: "loc1",
-    name: "Neon District Hub",
-    type: "Historic Landmark",
-    imageUrl: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&q=80",
-    distance: 150,
-    visitorsToday: 47,
-    lastVisited: "2h ago"
-  })
+  const [selectedHotspot, setSelectedHotspot] = useState<PlaceResult | null>(null)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [selectedNPC, setSelectedNPC] = useState<NPC | null>(null)
   const [chatMessages, setChatMessages] = useState<{ id: string; sender: "npc" | "player"; text: string }[]>([])
@@ -307,9 +315,14 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     }))
   }, [])
 
+  const handleHotspotClick = (hotspot: PlaceResult) => {
+    setSelectedHotspot(hotspot)
+    setShowLocationScreen(true)
+    onMarkerTap?.(hotspot.place_id)
+  }
+
   const handleMarkerClick = (npc: NPC) => {
     setSelectedNPC(npc)
-    // Show location screen with NPC cards when tapping a marker
     setShowLocationScreen(true)
     onMarkerTap?.(npc.id)
   }
@@ -548,26 +561,87 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
     }
   }
 
+  const { bounds, hotspots, playerPos, isMapIdle } = mapContext ?? {
+    map: null,
+    bounds: null,
+    hotspots: [] as PlaceResult[],
+    playerPos: { lat: 40.758, lng: -73.9855 },
+    isMapIdle: true,
+  }
+
+  const currentLocation = useMemo(() => {
+    if (!selectedHotspot || !mapContext) return null
+    const dist = haversineMeters(
+      mapContext.playerPos.lat,
+      mapContext.playerPos.lng,
+      selectedHotspot.lat,
+      selectedHotspot.lng
+    )
+    return {
+      id: selectedHotspot.place_id,
+      name: selectedHotspot.name,
+      type: selectedHotspot.types?.[0] ?? "Point of Interest",
+      imageUrl: PLACEHOLDER_IMAGE,
+      distance: Math.round(dist),
+      visitorsToday: selectedHotspot.user_ratings_total,
+      lastVisited: selectedHotspot.rating ? `★ ${selectedHotspot.rating}` : undefined,
+    }
+  }, [selectedHotspot, mapContext])
+
+  const hotspotCardData = useMemo(
+    () =>
+      hotspots.map((h) => ({
+        id: h.place_id,
+        name: h.name,
+        title: h.types?.[0] ?? "Point of Interest",
+        avatarInitial: h.name[0]?.toUpperCase() ?? "?",
+        trustLevel: h.rating ? Math.round(h.rating * 20) : 50,
+        taskPreview: h.rating != null ? `★ ${h.rating} (${h.user_ratings_total ?? 0} reviews)` : "Place of interest",
+        taskType: "location" as const,
+      })),
+    [hotspots]
+  )
+
+  const handleHotspotCardSelect = (placeId: string) => {
+    const h = hotspots.find((x) => x.place_id === placeId)
+    if (h) {
+      setSelectedHotspot(h)
+      setShowLocationScreen(true)
+    }
+  }
+
   return (
     <div className="fixed inset-0 pointer-events-none z-10">
-      {/* Map placeholder area - markers would be rendered by Leaflet */}
-      <div className="absolute inset-0 pointer-events-auto">
-        {/* Demo markers - in real implementation these would be Leaflet markers */}
-        {npcs.map(npc => (
-          <MapMarker
-            key={npc.id}
-            type={npc.quest ? "quest" : npc.microQuest ? "npc" : npc.mood === "neutral" ? "mystery" : "npc"}
-            name={npc.name}
-            distance={Math.floor(Math.random() * 500) + 100}
-            isActive={selectedNPC?.id === npc.id}
-            onClick={() => handleMarkerClick(npc)}
-            style={{
-              left: `${npc.position.x}%`,
-              top: `${npc.position.y}%`,
-              pointerEvents: 'auto'
-            }}
-          />
-        ))}
+      {/* Map area - hotspot markers from Google Places (fade out during zoom/pan) */}
+      <div
+        className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+        style={{ opacity: isMapIdle ? 1 : 0 }}
+      >
+        {bounds &&
+          hotspots.map((hotspot) => {
+            const { x, y } = latLngToPercent(hotspot.lat, hotspot.lng, bounds)
+            const distance = haversineMeters(
+              playerPos.lat,
+              playerPos.lng,
+              hotspot.lat,
+              hotspot.lng
+            )
+            return (
+              <MapMarker
+                key={hotspot.place_id}
+                type={hotspot.rating && hotspot.rating >= 4.5 ? "quest" : "npc"}
+                name={hotspot.name}
+                distance={Math.round(distance)}
+                isActive={selectedHotspot?.place_id === hotspot.place_id}
+                onClick={() => handleHotspotClick(hotspot)}
+                style={{
+                  left: `${x}%`,
+                  top: `${y}%`,
+                  pointerEvents: "auto",
+                }}
+              />
+            )
+          })}
       </div>
 
       {/* Top HUD */}
@@ -614,13 +688,13 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         />
       )}
 
-      {/* Quests Panel - Task content only here, never as a pop-up on the map */}
+      {/* Quests Panel - NPC tasks + Nearby Places */}
       {activeTab === "quests" && (
         <div className="absolute bottom-24 left-0 right-0 max-h-[60vh] overflow-y-auto pointer-events-auto z-25 bg-background/95 backdrop-blur-md border-t border-border">
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-mono text-foreground uppercase tracking-wider">All Nearby Tasks</h3>
-              <span className="text-xs font-mono text-primary">{npcs.length} available</span>
+              <h3 className="text-sm font-mono text-foreground uppercase tracking-wider">Tasks & Nearby Places</h3>
+              <span className="text-xs font-mono text-primary">{npcs.length} NPCs · {hotspots.length} places</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {npcs.map((npc) => {
@@ -852,8 +926,8 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
         isSubmitting={isSubmitting}
       />
 
-      {/* Location Screen with NPC Cards */}
-      {showLocationScreen && (
+      {/* Location Screen with Nearby Places */}
+      {showLocationScreen && currentLocation && (
         <div className="fixed inset-0 z-40 flex flex-col bg-background pointer-events-auto">
           {/* Location Display - Top 3/4 */}
           <div className="relative flex-1 min-h-0">
@@ -871,31 +945,12 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
             </button>
           </div>
 
-          {/* NPC Cards Strip - Bottom 1/4 */}
+          {/* Nearby Places Strip - Bottom 1/4 (hotspots when viewing a place) */}
           <div className="relative bg-background/95 backdrop-blur-md border-t border-border pt-3 pb-6">
             <NPCCardStrip
-              npcs={npcs.map(npc => ({
-                id: npc.id,
-                name: npc.name,
-                title: npc.title,
-                avatarInitial: npc.avatarInitial,
-                trustLevel: npc.trustLevel || 50,
-                taskPreview: npc.microQuest?.description || npc.quest?.description || "No active task",
-                taskType: npc.microQuest?.type === "photo" ? "photo" : npc.microQuest?.type === "yes_no" ? "yes_no" : npc.microQuest?.type === "description" ? "description" : "confirm",
-                microQuest: npc.microQuest,
-                imageUrl: npc.character?.imageUrl
-              }))}
-              onNPCSelect={handleNPCCardSelect}
-              selectedNPCId={selectedNPC?.id}
-              activeNPCId={activeQuestNpcId}
-              onActivate={(npcId) => setActiveQuestNpcId((prev) => (prev === npcId ? null : npcId))}
-              expandedNPCId={expandedQuestNpcId}
-              onPhotoCapture={() => setShowPhotoProof(true)}
-              onQuestComplete={(npcId, answer) => {
-                const npc = npcs.find(n => n.id === npcId)
-                if (npc) handleMicroQuestComplete(answer, npc)
-              }}
-              isSubmitting={isSubmitting}
+              npcs={hotspotCardData}
+              onNPCSelect={handleHotspotCardSelect}
+              selectedNPCId={selectedHotspot?.place_id}
             />
           </div>
         </div>

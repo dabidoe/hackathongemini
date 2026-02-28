@@ -25,7 +25,7 @@ export function PhotoProof({
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [isVerifying, setIsVerifying] = useState(false)
   const [isVerified, setIsVerified] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
+  const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleCapture = () => {
@@ -51,11 +51,23 @@ export function PhotoProof({
     setIsVerified(true)
   }
 
-  const handleSubmit = () => {
-    if (capturedImage) {
-      onSubmit(capturedImage)
+  const handleSubmit = async () => {
+    if (!capturedImage) return
+    setIsUploading(true)
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: capturedImage }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Upload failed")
+      onSubmit(data.url)
       handleReset()
       onClose()
+    } catch (err) {
+      console.error("Upload error:", err)
+      setIsUploading(false)
     }
   }
 
@@ -212,9 +224,9 @@ export function PhotoProof({
             <Button 
               className="flex-1 font-mono text-xs bg-neon-green/20 border border-neon-green text-neon-green hover:bg-neon-green/30 disabled:opacity-50"
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploading}
             >
-              {isSubmitting ? (
+              {isSubmitting || isUploading ? (
                 <>
                   <Upload className="w-3 h-3 mr-1.5 animate-pulse" />
                   Uploading...

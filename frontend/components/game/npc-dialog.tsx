@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 interface DialogOption {
   id: string
   text: string
-  action?: "accept_quest" | "decline" | "more_info" | "custom"
+  action?: "accept_quest" | "decline" | "more_info" | "custom" | "micro_quest"
 }
 
 interface ChatMessage {

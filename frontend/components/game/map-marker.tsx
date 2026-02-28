@@ -14,6 +14,8 @@ interface MapMarkerProps {
   onClick?: () => void
   style?: React.CSSProperties
   avatarUrl?: string
+  /** When set, show this image for npc/place markers instead of the default icon */
+  placeImageUrl?: string
 }
 
 export function MapMarker({
@@ -24,6 +26,7 @@ export function MapMarker({
   onClick,
   style,
   avatarUrl,
+  placeImageUrl,
 }: MapMarkerProps) {
   const [isHovered, setIsHovered] = useState(false)
 
@@ -79,7 +82,7 @@ export function MapMarker({
       {/* Pulse ring for active/quest/player markers */}
       {(isActive || type === "quest" || type === "player") && (
         <div
-          className={`absolute inset-0 ${styles.bg} rounded-full animate-ping opacity-75`}
+          className={`absolute inset-0 w-14 h-14 rounded-full ${styles.bg} animate-ping opacity-75`}
           style={{ animationDuration: "2s" }}
         />
       )}
@@ -87,7 +90,7 @@ export function MapMarker({
       {/* Main marker */}
       <div
         className={`
-        relative w-10 h-10 rounded-full
+        relative w-14 h-14 rounded-full
         ${styles.bg} ${styles.border} border-2
         flex items-center justify-center overflow-hidden
         transition-transform duration-200
@@ -100,13 +103,21 @@ export function MapMarker({
           <Image
             src={avatarUrl}
             alt="You"
-            width={40}
-            height={40}
+            width={56}
+            height={56}
             className="w-full h-full object-cover"
-            unoptimized={avatarUrl.startsWith("blob:") || avatarUrl.includes("picsum")}
+            unoptimized={avatarUrl.startsWith("blob:") || avatarUrl.startsWith("data:") || avatarUrl.includes("picsum")}
+          />
+        ) : (type === "npc" || type === "quest") && placeImageUrl ? (
+          <Image
+            src={placeImageUrl}
+            alt={name}
+            width={56}
+            height={56}
+            className="w-full h-full object-cover"
           />
         ) : (
-          <Icon className={`w-5 h-5 ${styles.iconColor}`} />
+          <Icon className={`w-6 h-6 ${styles.iconColor}`} />
         )}
       </div>
 

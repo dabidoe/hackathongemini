@@ -29,7 +29,7 @@ interface NearbySearchResponse {
   error_message?: string;
 }
 
-const MAX_RESULTS = 30;
+const MAX_RESULTS = 60; // Use all results from 3 place types (Google returns up to 20 per type)
 const PLACE_TYPES = ["tourist_attraction", "park", "point_of_interest"] as const;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 

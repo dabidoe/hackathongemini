@@ -883,6 +883,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
               hotspot.lat,
               hotspot.lng
             )
+            const placeImageUrl = getLocationImageUrl(hotspot.name, hotspot.place_id)
             return (
               <MapMarker
                 key={hotspot.place_id}
@@ -891,6 +892,7 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
                 distance={Math.round(distance)}
                 isActive={selectedHotspot?.place_id === hotspot.place_id}
                 onClick={() => handleHotspotClick(hotspot)}
+                placeImageUrl={placeImageUrl || undefined}
                 style={{
                   left: `${x}%`,
                   top: `${y}%`,
@@ -899,11 +901,12 @@ export function GameOverlay({ onMarkerTap }: GameOverlayProps) {
               />
             )
           })}
-        {/* Player marker - same fade behavior as hotspot markers */}
+        {/* Player marker - same fade behavior as hotspot markers; shows generated profile portrait when set */}
         {bounds && playerPos && (
           <MapMarker
             type="player"
             name="You"
+            avatarUrl={profileImageUrl ?? undefined}
             style={{
               left: `${latLngToPercent(playerPos.lat, playerPos.lng, bounds).x}%`,
               top: `${latLngToPercent(playerPos.lat, playerPos.lng, bounds).y}%`,

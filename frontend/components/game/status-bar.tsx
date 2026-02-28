@@ -82,11 +82,11 @@ export function StatusBar({
   }
 
   return (
-    <GlassPanel variant="strong" className="px-3 py-2">
+    <GlassPanel variant="strong" className="px-4 py-2.5">
       <div className="flex items-center justify-between">
         {/* Left: Player Info - click to open profile */}
         <div
-          className={`flex items-center gap-3 ${onProfileClick ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
+          className={`flex items-center gap-3.5 ${onProfileClick ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
           onClick={onProfileClick}
           role={onProfileClick ? "button" : undefined}
           aria-label={onProfileClick ? "Open profile" : undefined}
@@ -94,7 +94,7 @@ export function StatusBar({
           <div className="relative flex-shrink-0">
             {profileImageUrl ? (
               <>
-                <div className="w-8 h-8 rounded-full overflow-hidden border border-primary bg-primary/20">
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-primary bg-primary/20">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={profileImageUrl}
@@ -102,36 +102,36 @@ export function StatusBar({
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border border-background" title={`Level ${displayLevel}`} />
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-primary border border-background" title={`Level ${displayLevel}`} />
               </>
             ) : user?.photoURL ? (
               <img
                 src={user.photoURL}
                 alt=""
-                className="w-8 h-8 rounded-full border border-primary object-cover"
+                className="w-10 h-10 rounded-full border border-primary object-cover"
               />
             ) : (
               <>
-                <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary flex items-center justify-center">
-                  <span className="text-xs font-mono text-primary font-bold">{displayLevel}</span>
+                <div className="w-10 h-10 rounded-full bg-primary/20 border border-primary flex items-center justify-center">
+                  <span className="text-sm font-mono text-primary font-bold">{displayLevel}</span>
                 </div>
-                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary border border-background" />
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-primary border border-background" />
               </>
             )}
           </div>
           <div className="flex flex-col">
-            <span className="text-xs font-mono text-foreground/90 uppercase tracking-wider">
+            <span className="text-sm font-mono text-foreground/90 uppercase tracking-wider">
               {user?.displayName ?? playerName}
             </span>
             {/* XP Bar */}
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
+            <div className="flex items-center gap-2 mt-1">
+              <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-primary rounded-full transition-all duration-500"
                   style={{ width: `${xpPercentage}%` }}
                 />
               </div>
-              <span className="text-[10px] font-mono text-muted-foreground">
+              <span className="text-xs font-mono text-muted-foreground">
                 {displayXp}/{displayMaxXp}
               </span>
             </div>
@@ -139,45 +139,45 @@ export function StatusBar({
         </div>
 
         {/* Right: Auth + Status Icons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           {!loading && (
             user ? (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-[10px] font-mono gap-1"
+                className="h-8 px-2.5 text-xs font-mono gap-1.5"
                 onClick={signOut}
               >
-                <LogOut className="w-3 h-3" />
+                <LogOut className="w-4 h-4" />
                 Sign out
               </Button>
             ) : (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-[10px] font-mono gap-1"
+                className="h-8 px-2.5 text-xs font-mono gap-1.5"
                 onClick={handleSignIn}
                 disabled={isSigningIn}
               >
-                <LogIn className="w-3 h-3" />
+                <LogIn className="w-4 h-4" />
                 Sign in
               </Button>
             )
           )}
           {streak > 0 && (
-            <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent/20 border border-accent/30">
-              <Flame className="w-3.5 h-3.5 text-accent" />
-              <span className="text-[10px] font-mono font-bold text-accent">{streak}</span>
+            <div className="flex items-center gap-1 px-2 py-1 rounded bg-accent/20 border border-accent/30">
+              <Flame className="w-4 h-4 text-accent" />
+              <span className="text-xs font-mono font-bold text-accent">{streak}</span>
             </div>
           )}
-          <div className="flex items-center gap-1">
-            <MapPin className="w-3 h-3 text-primary" />
-            <span className="text-[10px] font-mono text-primary uppercase">GPS</span>
+          <div className="flex items-center gap-1.5">
+            <MapPin className="w-4 h-4 text-primary" />
+            <span className="text-xs font-mono text-primary uppercase">GPS</span>
           </div>
-          <div className="flex items-center gap-1 text-foreground/80">
-            <Target className="w-3 h-3 text-primary" />
-            <span className="text-[10px] font-mono">{questsCompleted}</span>
-            <span className="text-[9px] font-mono text-muted-foreground uppercase hidden sm:inline">Missions</span>
+          <div className="flex items-center gap-1.5 text-foreground/80">
+            <Target className="w-4 h-4 text-primary" />
+            <span className="text-xs font-mono">{questsCompleted}</span>
+            <span className="text-[10px] font-mono text-muted-foreground uppercase hidden sm:inline">Missions</span>
           </div>
         </div>
       </div>

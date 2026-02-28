@@ -16,15 +16,15 @@ interface ChipGroupProps<T extends string> {
 
 function ChipGroup<T extends string>({ label, options, value, onChange }: ChipGroupProps<T>) {
   return (
-    <div className="space-y-1.5">
-      <span className="text-[9px] font-mono uppercase tracking-wider text-foreground font-medium">{label}</span>
-      <div className="flex flex-wrap gap-1.5">
+    <div className="space-y-2">
+      <span className="text-[10px] font-mono uppercase tracking-wider text-foreground font-medium">{label}</span>
+      <div className="flex flex-wrap gap-2">
         {options.map((opt) => (
           <button
             key={opt}
             type="button"
             onClick={() => onChange(value === opt ? undefined : (opt as T))}
-            className={`px-2.5 py-1 rounded-full text-[10px] font-mono transition-all border ${
+            className={`px-3 py-1.5 rounded-full text-xs font-mono transition-all border ${
               value === opt
                 ? "bg-primary/30 border-primary text-primary font-semibold"
                 : "bg-background/50 border-primary/40 text-foreground hover:border-primary/60 hover:bg-primary/10"
@@ -45,7 +45,7 @@ interface ProfileChipsProps {
 
 export function ProfileChips({ chips, onChange }: ProfileChipsProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <ChipGroup
         label="Theme"
         options={THEME_OPTIONS}

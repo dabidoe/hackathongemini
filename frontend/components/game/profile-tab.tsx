@@ -117,11 +117,11 @@ export function ProfileTab({ playerStats, onClose, profileImageUrl = null, onPro
 
   return (
     <div className="absolute bottom-24 left-0 right-0 max-h-[85vh] min-h-[70vh] overflow-y-auto pointer-events-auto z-25 bg-background/70 backdrop-blur-sm border-t border-border">
-      <div className="flex flex-col items-center gap-6 p-6">
+      <div className="flex flex-col items-center gap-8 p-7">
         <div className="flex items-center justify-between w-full max-w-2xl">
-          <div className="flex items-center gap-2">
-            <User className="w-5 h-5 text-primary flex-shrink-0" />
-            <h2 className="text-sm font-mono font-bold text-foreground uppercase tracking-wider">
+          <div className="flex items-center gap-3">
+            <User className="w-6 h-6 text-primary flex-shrink-0" />
+            <h2 className="text-base font-mono font-bold text-foreground uppercase tracking-wider">
               Your Character
             </h2>
           </div>
@@ -129,22 +129,22 @@ export function ProfileTab({ playerStats, onClose, profileImageUrl = null, onPro
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
+              className="p-2 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Close"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           )}
         </div>
 
         {/* Avatar + chips: stacked on mobile, side-by-side on larger screens */}
-        <div className="w-full max-w-2xl flex flex-col md:flex-row gap-6 items-start">
+        <div className="w-full max-w-2xl flex flex-col md:flex-row gap-8 items-start">
           {/* Clickable upload container */}
           <button
             type="button"
             onClick={() => !isUploading && fileInputRef.current?.click()}
             disabled={isUploading}
-            className={`flex-shrink-0 w-full max-w-[240px] md:w-48 aspect-[3/4] rounded-lg overflow-hidden border-2 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+            className={`flex-shrink-0 w-full max-w-[280px] md:w-56 aspect-[3/4] rounded-lg overflow-hidden border-2 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 ${
               isDragging ? "border-primary bg-primary/10" : "border-primary/60 bg-muted/40 hover:border-primary/80 hover:bg-muted/60"
             }`}
             onDragOver={(e) => {
@@ -158,8 +158,8 @@ export function ProfileTab({ playerStats, onClose, profileImageUrl = null, onPro
               <Image
                 src={displayImageUrl}
                 alt="Profile"
-                width={320}
-                height={427}
+                width={336}
+                height={448}
                 className="w-full h-full object-cover"
                 unoptimized={
                   displayImageUrl.startsWith("blob:") ||
@@ -168,9 +168,9 @@ export function ProfileTab({ playerStats, onClose, profileImageUrl = null, onPro
                 }
               />
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center">
-                <Upload className="w-10 h-10 text-muted-foreground/50 mb-2" />
-                <p className="text-xs font-mono text-muted-foreground leading-tight">
+              <div className="w-full h-full flex flex-col items-center justify-center p-5 text-center">
+                <Upload className="w-12 h-12 text-muted-foreground/50 mb-3" />
+                <p className="text-sm font-mono text-muted-foreground leading-tight">
                   {isUploading ? "Uploading..." : "Tap to upload"}
                 </p>
               </div>
@@ -186,25 +186,25 @@ export function ProfileTab({ playerStats, onClose, profileImageUrl = null, onPro
           />
 
           {/* Theme only: Fantasy or Cyberpunk → sent to Gemini */}
-          <div className="flex-1 w-full md:min-w-0 space-y-4 p-4 rounded-lg border-2 border-primary/50 bg-background/60 backdrop-blur-sm">
-            <p className="text-[10px] font-mono text-muted-foreground">
+          <div className="flex-1 w-full md:min-w-0 space-y-5 p-5 rounded-lg border-2 border-primary/50 bg-background/60 backdrop-blur-sm">
+            <p className="text-xs font-mono text-muted-foreground">
               Pick <strong className="text-foreground">Fantasy</strong> or <strong className="text-foreground">Cyberpunk</strong>, then Regenerate. Your photo is sent to Gemini and a styled portrait is shown below.
             </p>
             <ProfileChips chips={selectedChips} onChange={setSelectedChips} />
             <Button
               size="sm"
-              className="w-full h-8 font-mono text-[10px] bg-primary/20 border border-primary text-primary hover:bg-primary/30"
+              className="w-full h-10 font-mono text-xs bg-primary/20 border border-primary text-primary hover:bg-primary/30"
               onClick={handleRegenerate}
               disabled={isGenerating || !sourceImageUrl}
             >
               {isGenerating ? (
                 <>
-                  <RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                   Generating...
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-3 h-3 mr-1.5" />
+                  <Sparkles className="w-4 h-4 mr-2" />
                   Regenerate
                 </>
               )}
@@ -213,33 +213,33 @@ export function ProfileTab({ playerStats, onClose, profileImageUrl = null, onPro
         </div>
 
         {generateError && (
-          <p className="text-xs text-destructive font-mono w-full max-w-xs text-center">
+          <p className="text-sm text-destructive font-mono w-full max-w-xs text-center">
             {generateError}
           </p>
         )}
 
         {/* Stats */}
-        <div className="w-full max-w-xs p-3 rounded-lg bg-background/60 border-2 border-primary/40">
-          <h4 className="text-xs font-mono uppercase tracking-wider text-foreground mb-2">
+        <div className="w-full max-w-sm p-4 rounded-lg bg-background/60 border-2 border-primary/40">
+          <h4 className="text-sm font-mono uppercase tracking-wider text-foreground mb-3">
             Your Stats
           </h4>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-3 gap-3 text-center">
             <div>
-              <div className="text-lg font-bold text-primary">{playerStats.level}</div>
-              <div className="text-[9px] font-mono text-muted-foreground uppercase">Level</div>
+              <div className="text-xl font-bold text-primary">{playerStats.level}</div>
+              <div className="text-[10px] font-mono text-muted-foreground uppercase">Level</div>
             </div>
             <div>
-              <div className="text-lg font-bold text-foreground">{playerStats.questsCompleted}</div>
-              <div className="text-[9px] font-mono text-muted-foreground uppercase">Quests</div>
+              <div className="text-xl font-bold text-foreground">{playerStats.questsCompleted}</div>
+              <div className="text-[10px] font-mono text-muted-foreground uppercase">Quests</div>
             </div>
             <div>
-              <div className="text-lg font-bold text-foreground">{playerStats.streak}</div>
-              <div className="text-[9px] font-mono text-muted-foreground uppercase">Streak</div>
+              <div className="text-xl font-bold text-foreground">{playerStats.streak}</div>
+              <div className="text-[10px] font-mono text-muted-foreground uppercase">Streak</div>
             </div>
           </div>
         </div>
 
-        <p className="text-[9px] font-mono text-foreground/90 text-center pb-2">
+        <p className="text-[10px] font-mono text-foreground/90 text-center pb-2">
           AI_GENERATED // GEMINI
         </p>
       </div>

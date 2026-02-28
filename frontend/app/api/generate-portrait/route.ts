@@ -137,7 +137,11 @@ async function callNanoBananaImageEdit(args: {
     throw new Error(msg)
   }
   if (submitData?.code !== undefined && submitData.code !== 0) {
-    throw new Error(submitData?.data?.error ?? submitData?.message ?? "Nano Banana error")
+    const msg = submitData?.data?.error ?? submitData?.message ?? "Nano Banana error"
+    const hint = /unauthorized/i.test(String(msg))
+      ? " Check NANO_BANANA_API_KEY in .env.local, or use GOOGLE_CLOUD_API_KEY for Gemini instead."
+      : ""
+    throw new Error(msg + hint)
   }
 
   const immediateUrl = submitData?.data?.results?.[0]?.url ?? null

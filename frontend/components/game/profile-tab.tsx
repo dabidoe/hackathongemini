@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { User, Sparkles, RefreshCw } from "lucide-react"
+import { useState, useRef, useCallback } from "react"
+import { User, Sparkles, RefreshCw, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import Image from "next/image"
+import { ProfileChips, type SelectedChips } from "./profile-chips"
 
 interface ProfileTabProps {
   playerStats: {
@@ -18,47 +18,183 @@ interface ProfileTabProps {
 }
 
 export function ProfileTab({ playerStats }: ProfileTabProps) {
-  const [characterDescription, setCharacterDescription] = useState("")
+  const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null)
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null)
+  const [selectedChips, setSelectedChips] = useState<SelectedChips>({})
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const generateCharacterImage = async () => {
-    if (!characterDescription.trim()) return
+  const displayImageUrl = generatedImageUrl ?? sourceImageUrl
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith("image/")) return
+      setIsUploading(true)
+      setGenerateError(null)
+      try {
+        const formData = new FormData()
+        formData.append("image", file)
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setGenerateError(data?.error ?? "Upload failed")
+          return
+        }
+        if (data?.url) {
+          setSourceImageUrl(data.url)
+          setGeneratedImageUrl(null)
+        }
+      } catch {
+        setGenerateError("Upload failed")
+      } finally {
+        setIsUploading(false)
+      }
+    },
+    []
+  )
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      setIsDragging(false)
+      const file = e.dataTransfer.files[0]
+      if (file) handleFile(file)
+    },
+    [handleFile]
+  )
+
+  const handleFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (file) handleFile(file)
+      e.target.value = ""
+    },
+    [handleFile]
+  )
+
+  const handleRegenerate = async () => {
+    if (!sourceImageUrl) return
     setIsGenerating(true)
     setGenerateError(null)
-    const prompt = `Portrait of ${characterDescription}, cyberpunk style, cinematic lighting, highly detailed, orange and black color scheme, historical urban aesthetic, character portrait for a game`
     try {
-      const response = await fetch("/api/generate-character", {
+      const res = await fetch("/api/generate-character", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, description: characterDescription }),
+        body: JSON.stringify({
+          imageUrl: sourceImageUrl,
+          chips: selectedChips,
+        }),
       })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        setGenerateError(data?.error ?? data?.message ?? "Failed to generate. Try again.")
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setGenerateError(data?.error ?? data?.message ?? "Failed to generate")
         return
       }
       if (data?.imageUrl) setGeneratedImageUrl(data.imageUrl)
-    } catch (error) {
-      console.error("Failed to generate image:", error)
-      setGenerateError("Connection error. Try again.")
+    } catch {
+      setGenerateError("Connection error")
     } finally {
       setIsGenerating(false)
     }
   }
 
   return (
-    <div className="absolute bottom-24 left-0 right-0 max-h-[60vh] overflow-y-auto pointer-events-auto z-25 bg-background/95 backdrop-blur-md border-t border-border">
-      <div className="p-4 space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <User className="w-5 h-5 text-primary" />
-          <h2 className="text-sm font-mono font-bold text-foreground uppercase tracking-wider">Your Character</h2>
+    <div className="absolute bottom-24 left-0 right-0 max-h-[85vh] min-h-[70vh] overflow-y-auto pointer-events-auto z-25 bg-background/70 backdrop-blur-sm border-t border-border">
+      <div className="flex flex-col items-center gap-6 p-6">
+        <div className="flex items-center gap-2 w-full max-w-xs">
+          <User className="w-5 h-5 text-primary flex-shrink-0" />
+          <h2 className="text-sm font-mono font-bold text-foreground uppercase tracking-wider">
+            Your Character
+          </h2>
         </div>
 
-        {/* Your Stats */}
-        <div className="p-3 rounded-lg bg-muted/30 border border-border">
-          <h4 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">Your Stats</h4>
+        {/* Avatar + chips: stacked on mobile, side-by-side on larger screens */}
+        <div className="w-full max-w-2xl flex flex-col md:flex-row gap-6 items-start">
+          {/* Clickable upload container */}
+          <button
+            type="button"
+            onClick={() => !isUploading && fileInputRef.current?.click()}
+            disabled={isUploading}
+            className={`flex-shrink-0 w-full max-w-[240px] md:w-48 aspect-[3/4] rounded-lg overflow-hidden border-2 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+              isDragging ? "border-primary bg-primary/10" : "border-primary/60 bg-muted/40 hover:border-primary/80 hover:bg-muted/60"
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setIsDragging(true)
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+          >
+            {displayImageUrl ? (
+              <Image
+                src={displayImageUrl}
+                alt="Profile"
+                width={320}
+                height={427}
+                className="w-full h-full object-cover"
+                unoptimized={
+                  displayImageUrl.startsWith("blob:") || displayImageUrl.includes("picsum")
+                }
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center">
+                <Upload className="w-10 h-10 text-muted-foreground/50 mb-2" />
+                <p className="text-xs font-mono text-muted-foreground leading-tight">
+                  {isUploading ? "Uploading..." : "Tap to upload"}
+                </p>
+              </div>
+            )}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="user"
+            className="hidden"
+            onChange={handleFileInputChange}
+          />
+
+          {/* Chips - right side on larger screens */}
+          <div className="flex-1 w-full md:min-w-0 space-y-4 p-4 rounded-lg border-2 border-primary/50 bg-background/60 backdrop-blur-sm">
+            <ProfileChips chips={selectedChips} onChange={setSelectedChips} />
+            <Button
+              size="sm"
+              className="w-full h-8 font-mono text-[10px] bg-primary/20 border border-primary text-primary hover:bg-primary/30"
+              onClick={handleRegenerate}
+              disabled={isGenerating || !sourceImageUrl}
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3 h-3 mr-1.5" />
+                  Regenerate
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {generateError && (
+          <p className="text-xs text-destructive font-mono w-full max-w-xs text-center">
+            {generateError}
+          </p>
+        )}
+
+        {/* Stats */}
+        <div className="w-full max-w-xs p-3 rounded-lg bg-background/60 border-2 border-primary/40">
+          <h4 className="text-xs font-mono uppercase tracking-wider text-foreground mb-2">
+            Your Stats
+          </h4>
           <div className="grid grid-cols-3 gap-2 text-center">
             <div>
               <div className="text-lg font-bold text-primary">{playerStats.level}</div>
@@ -75,83 +211,7 @@ export function ProfileTab({ playerStats }: ProfileTabProps) {
           </div>
         </div>
 
-        {/* Describe Your Character */}
-        <div>
-          <label className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1.5 block">
-            Describe Your Character
-          </label>
-          <p className="text-xs text-muted-foreground mb-2">
-            Include hair, eyes, clothing, accessories, mood, and background.
-          </p>
-          <Textarea
-            value={characterDescription}
-            onChange={(e) => setCharacterDescription(e.target.value)}
-            className="min-h-[100px] text-sm font-mono bg-muted/50 border-border resize-none text-muted-foreground placeholder:text-muted-foreground/60"
-            placeholder="A mysterious street runner with short silver hair, amber cybernetic eyes..."
-            disabled={isGenerating}
-          />
-        </div>
-
-        <Button
-          onClick={generateCharacterImage}
-          disabled={isGenerating || !characterDescription.trim()}
-          className="w-full h-10 font-mono text-xs bg-primary/20 border border-primary text-primary hover:bg-primary/30 disabled:opacity-50"
-        >
-          {isGenerating ? (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-4 h-4 mr-2" />
-              Generate Character Portrait
-            </>
-          )}
-        </Button>
-        {generateError && (
-          <p className="text-xs text-destructive font-mono">{generateError}</p>
-        )}
-
-        {/* Character Preview */}
-        <div>
-          <label className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1.5 block">
-            Character Preview
-          </label>
-          <div className="aspect-[3/4] max-h-48 rounded-lg overflow-hidden bg-muted/30 border border-border flex items-center justify-center">
-            {generatedImageUrl ? (
-              <Image
-                src={generatedImageUrl}
-                alt="Generated character"
-                width={300}
-                height={400}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="text-center p-4">
-                <User className="w-12 h-12 mx-auto text-muted-foreground/30 mb-2" />
-                <p className="text-[10px] font-mono text-muted-foreground">No character generated yet</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Preferences */}
-        <div className="p-3 rounded-lg bg-muted/30 border border-border">
-          <h4 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">Preferences</h4>
-          <div className="space-y-2">
-            <label className="flex items-center justify-between gap-2 text-xs font-mono text-foreground">
-              <span>Sound effects</span>
-              <input type="checkbox" defaultChecked className="rounded border-border bg-muted/50 text-primary" />
-            </label>
-            <label className="flex items-center justify-between gap-2 text-xs font-mono text-foreground">
-              <span>Quest notifications</span>
-              <input type="checkbox" defaultChecked className="rounded border-border bg-muted/50 text-primary" />
-            </label>
-          </div>
-        </div>
-
-        <p className="text-[9px] font-mono text-muted-foreground text-center pb-2">
+        <p className="text-[9px] font-mono text-foreground/90 text-center pb-2">
           AI_GENERATED // NANO_BANANA
         </p>
       </div>

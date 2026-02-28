@@ -22,9 +22,15 @@ function getFirebaseApp() {
     )
   }
 
+  const bucket =
+    process.env.FIREBASE_STORAGE_BUCKET ??
+    (typeof serviceAccount === "object" && "project_id" in serviceAccount
+      ? `${(serviceAccount as { project_id?: string }).project_id}.firebasestorage.app`
+      : undefined)
+
   return initializeApp({
     credential: cert(serviceAccount as ServiceAccount),
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    storageBucket: bucket,
   })
 }
 
@@ -62,10 +68,37 @@ let _firestore: ReturnType<typeof getFirestore> | null = null
 
 export function getFirebaseStorage() {
   if (!_storage) {
-    getFirebaseApp()
-    _storage = getStorage()
+    const app = getFirebaseApp()
+    _storage = getStorage(app)
   }
   return _storage
+}
+
+/** Get the storage bucket, with explicit name for reliability. */
+export function getStorageBucket() {
+  const bucketName =
+    process.env.FIREBASE_STORAGE_BUCKET ??
+    (() => {
+      try {
+        const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
+        if (credPath) {
+          const fullPath = resolve(process.cwd(), credPath)
+          const json = readFileSync(fullPath, "utf-8")
+          const parsed = JSON.parse(json) as { project_id?: string }
+          return parsed.project_id ? `${parsed.project_id}.firebasestorage.app` : undefined
+        }
+      } catch {
+        /* ignore */
+      }
+      return undefined
+    })()
+  if (!bucketName) {
+    throw new Error(
+      "FIREBASE_STORAGE_BUCKET not set. Add it to .env.local (e.g. your-project.appspot.com). " +
+        "Also ensure Firebase Storage is enabled: https://console.firebase.google.com → your project → Storage → Get started"
+    )
+  }
+  return getFirebaseStorage().bucket(bucketName)
 }
 
 export function getFirebaseFirestore() {

@@ -14,6 +14,15 @@ export default function GamePage() {
           <GoogleMapLayer />
         </div>
 
+        {/* Map darkening overlay — night vibe */}
+        <div
+          className="absolute inset-0 z-[5] pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse at center, rgba(0,0,0,0.35) 20%, rgba(0,0,0,0.6) 40%)",
+          }}
+        />
+
         {/* Game UI Overlay */}
         <GameOverlay />
       </MapProvider>

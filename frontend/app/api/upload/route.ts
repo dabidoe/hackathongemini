@@ -64,9 +64,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { getFirebaseStorage } = await import("@/lib/firebase-admin")
-    const storage = getFirebaseStorage()
-    const bucket = storage.bucket()
+    const { getStorageBucket } = await import("@/lib/firebase-admin")
+    const bucket = getStorageBucket()
     const ext = getExtension(mimeType)
     const path = `quest-photos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
@@ -82,7 +81,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Upload failed"
+    const msg = err instanceof Error ? err.message : "Upload failed"
+    const isBucketError =
+      msg.includes("bucket does not exist") ||
+      (err as { code?: number })?.code === 404
+    const message = isBucketError
+      ? "Firebase Storage bucket not found. Enable Storage in Firebase Console: Project → Storage → Get started"
+      : msg
     console.error("Upload error:", err)
     return NextResponse.json({ error: message }, { status: 500 })
   }

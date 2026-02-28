@@ -23,7 +23,7 @@ export function StatusBar({
   const xpPercentage = (xp / maxXp) * 100
 
   return (
-    <GlassPanel className="px-3 py-2">
+    <GlassPanel variant="strong" className="px-3 py-2">
       <div className="flex items-center justify-between">
         {/* Left: Player Info */}
         <div className="flex items-center gap-3">

@@ -3,11 +3,22 @@ import { NextRequest, NextResponse } from "next/server"
 interface QuestSubmitRequest {
   questId: string
   placeId: string
+  placeName?: string
+  questionType?: string
   photoUrl?: string
   answers?: {
     questionId: string
     answer: string | boolean
   }[]
+}
+
+function getQuestionType(questId: string, questionType?: string): string {
+  if (questionType) return questionType
+  if (questId.startsWith("mq") || questId.includes("-1")) return "photo"
+  if (questId.includes("2")) return "open_for_business"
+  if (questId.includes("3")) return "wheelchair_accessible"
+  if (questId.includes("4")) return "description"
+  return "unknown"
 }
 
 interface QuestSubmitResponse {
@@ -69,6 +80,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as QuestSubmitRequest
     const questId = body?.questId ?? ""
     const placeId = body?.placeId ?? ""
+    const placeName = body?.placeName ?? placeId
+    const questionType = getQuestionType(questId, body?.questionType)
     const photoUrl = body?.photoUrl
     const answers = Array.isArray(body?.answers) ? body.answers : undefined
 
@@ -114,6 +127,27 @@ export async function POST(request: NextRequest) {
       blockDelta,
       npcReactionText,
       streakBonus: verdict === "approved" ? streakBonus : undefined
+    }
+
+    if (verdict === "approved" && placeId && placeId.length > 10) {
+      try {
+        const answer = photoUrl ?? (answers?.[0]?.answer ?? null)
+        if (answer != null) {
+          const { getFirebaseFirestore } = await import("@/lib/firebase-admin")
+          const { FieldValue } = await import("firebase-admin/firestore")
+          const db = getFirebaseFirestore()
+          await db.collection("placeContributions").add({
+            placeId,
+            placeName,
+            questionType,
+            answer,
+            submittedAt: FieldValue.serverTimestamp(),
+            questId,
+          })
+        }
+      } catch (firebaseErr) {
+        console.warn("Failed to write placeContributions:", firebaseErr)
+      }
     }
 
     return NextResponse.json(response)

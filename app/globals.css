@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Theme overlay for map — base positioning; z-index above map, below HUD */
+.map-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  z-index: 5;
+}
+
+/* Fantasy: cinematic parchment quest map */
+.map-overlay-fantasy {
+  background:
+    radial-gradient(ellipse at center, transparent 45%, rgba(40, 25, 15, 0.18) 100%),
+    linear-gradient(180deg, rgba(255, 240, 210, 0.12), rgba(255, 235, 200, 0.1));
+}
+
+/* Parchment grain */
+.map-overlay-fantasy::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(90, 70, 50, 0.025) 2px,
+    rgba(90, 70, 50, 0.025) 3px
+  );
+  opacity: 0.6;
+}
+
+/* Soft magical glow */
+.map-overlay-fantasy::after {
+  content: "";
+  position: absolute;
+  inset: -30px;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 35% 25%,
+    rgba(255, 245, 210, 0.12),
+    transparent 50%
+  );
+}
+
+/* Cyberpunk: neon dystopian digital map */
+.map-overlay-cyberpunk {
+  background:
+    radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.28) 100%),
+    linear-gradient(180deg, rgba(0, 217, 255, 0.05), rgba(0, 200, 240, 0.04));
+}
+
+/* Scanlines */
+.map-overlay-cyberpunk::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 255, 255, 0.04) 2px,
+    rgba(0, 255, 255, 0.04) 3px
+  );
+  opacity: 0.5;
+}
+
+/* Neon corner glow */
+.map-overlay-cyberpunk::after {
+  content: "";
+  position: absolute;
+  inset: -30px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(255, 0, 255, 0.12), transparent 45%),
+    radial-gradient(circle at 15% 85%, rgba(0, 255, 200, 0.12), transparent 45%);
+}
+
+@supports (mix-blend-mode: screen) {
+  .map-overlay-cyberpunk {
+    mix-blend-mode: screen;
+  }
+}
